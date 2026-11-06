@@ -29,6 +29,12 @@ $sevenZip = (Get-Command 7z -ErrorAction SilentlyContinue).Source
 if (-not $sevenZip) { $sevenZip = 'C:\Program Files\7-Zip\7z.exe' }
 
 function Step($t) { Write-Host "`n== $t" -ForegroundColor Cyan }
+# Scoop records an install in scoop-install.json / scoop-manifest.json (install.json / manifest.json before 2026).
+function Installed($name) { (Test-Path "$scoop\apps\$name\current\scoop-install.json") -or (Test-Path "$scoop\apps\$name\current\install.json") }
+function InfoFile($name, $kind) {
+  $new = "$scoop\apps\$name\current\scoop-$kind.json"
+  if (Test-Path $new) { $new } else { "$scoop\apps\$name\current\$kind.json" }
+}
 
 # ---------------------------------------------------------------- Scoop and buckets
 Step "Scoop into $scoop"
@@ -65,11 +71,11 @@ foreach ($g in $groups) {
     $name = $id.Split('/')[-1]
     for ($try = 1; $try -le 2; $try++) {
       scoop install $id
-      if (Test-Path "$scoop\apps\$name\current\install.json") { break }
+      if (Installed $name) { break }
       Write-Host "  retry $id"
       scoop uninstall $name 2>$null | Out-Null
     }
-    if (Test-Path "$scoop\apps\$name\current\install.json") { $installed[$g.Name] += $name }
+    if (Installed $name) { $installed[$g.Name] += $name }
     else { $failed += $id; Write-Host "::warning::$id failed to install and is left out of this release" }
   }
 }
@@ -94,7 +100,7 @@ if ($LASTEXITCODE) { throw '7z failed for scoop.zip' }
 Pop-Location
 
 # ---------------------------------------------------------------- helpers
-function Get-Manifest($name) { Get-Content "$scoop\apps\$name\current\manifest.json" -Raw | ConvertFrom-Json }
+function Get-Manifest($name) { Get-Content (InfoFile $name 'manifest') -Raw | ConvertFrom-Json }
 function Arch($m, $key) {
   $a = $m.architecture.'64bit'
   if ($a -and $a.PSObject.Properties.Name -contains $key) { return $a.$key }
@@ -162,7 +168,7 @@ foreach ($g in $groups) {
     # robocopy copies junction targets, so persisted folders (settings, data) come along as real folders
     robocopy $src $dst /E /R:1 /W:1 /NFL /NDL /NJH /NJS /NP /MT:8 | Out-Null
     if ($LASTEXITCODE -ge 8) { throw "robocopy $name failed ($LASTEXITCODE)" }
-    Remove-Item "$dst\install.json", "$dst\manifest.json" -ErrorAction SilentlyContinue
+    Remove-Item "$dst\install.json", "$dst\manifest.json", "$dst\scoop-install.json", "$dst\scoop-manifest.json" -ErrorAction SilentlyContinue
     $roots = @("$scoop\apps\$name\$ver", "$scoop\apps\$name\current", "$scoop\persist\$name")
 
     $bins = foreach ($b in (AsList (Arch $m 'bin'))) {
@@ -179,7 +185,7 @@ foreach ($g in $groups) {
       [ordered]@{ target = ([string]$s[0]).Replace('\', '/'); name = [string]$s[1]; args = if ($s.Count -gt 2) { Placeholders ([string]$s[2]) $ver } else { '' } }
     }
     $fonts = @()
-    if ((Get-Content "$scoop\apps\$name\current\install.json" -Raw | ConvertFrom-Json).bucket -eq 'nerd-fonts') {
+    if ((Get-Content (InfoFile $name 'install') -Raw | ConvertFrom-Json).bucket -eq 'nerd-fonts') {
       $fonts = @(Get-ChildItem $dst -File | Where-Object { $_.Extension -in '.ttf', '.otf' } | ForEach-Object Name)
     }
     $rewrite = @(Find-Rewrites (Resolve-Path $dst).Path $roots)

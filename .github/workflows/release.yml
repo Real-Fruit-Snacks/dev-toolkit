@@ -67,7 +67,7 @@ jobs:
     needs: prepare
     runs-on: windows-2022
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: build dtk.exe
         shell: pwsh
         run: |
@@ -78,7 +78,7 @@ jobs:
           .\out\dtk.exe version
       - name: upload
         run: python scripts/upload-assets.py --tag ${{ needs.prepare.outputs.tag }} --out out --meta meta
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with: { name: meta-dtk, path: meta, retention-days: 3 }
 
   tools:
@@ -86,7 +86,7 @@ jobs:
     runs-on: windows-2022
     timeout-minutes: 180
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: collect the Scoop apps
         shell: pwsh
         run: .\scripts\collect-tools.ps1 -Stage D:\stage -Out D:\out
@@ -95,7 +95,7 @@ jobs:
       - name: facts
         shell: pwsh
         run: New-Item -ItemType Directory facts -Force | Out-Null; Copy-Item D:\out\*.facts.json facts\
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with: { name: meta-tools, path: "meta\n facts", retention-days: 3 }
 
   rust:
@@ -103,7 +103,7 @@ jobs:
     runs-on: windows-2022
     timeout-minutes: 180
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: build the Rust toolchains
         shell: pwsh
         run: |
@@ -113,14 +113,14 @@ jobs:
         run: python scripts/upload-assets.py --tag ${{ needs.prepare.outputs.tag }} --out D:\out --meta meta
       - shell: pwsh
         run: New-Item -ItemType Directory facts -Force | Out-Null; Copy-Item D:\out\*.facts.json facts\
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with: { name: meta-rust, path: "meta\n facts", retention-days: 3 }
 
   python:
     needs: prepare
     runs-on: windows-2022
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: build python.zip
         shell: pwsh
         run: .\scripts\build-python.ps1 -Version 3.14 -Stage D:\stage -Out D:\out
@@ -128,7 +128,7 @@ jobs:
         run: python scripts/upload-assets.py --tag ${{ needs.prepare.outputs.tag }} --out D:\out --meta meta
       - shell: pwsh
         run: New-Item -ItemType Directory facts -Force | Out-Null; Copy-Item D:\out\*.facts.json facts\
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with: { name: meta-python, path: "meta\n facts", retention-days: 3 }
 
   npm:
@@ -136,8 +136,8 @@ jobs:
     runs-on: windows-2022
     timeout-minutes: 300
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with: { node-version: '26' }
       - name: seed the npm cache
         shell: pwsh
@@ -155,7 +155,7 @@ jobs:
         run: python scripts/upload-assets.py --tag ${{ needs.prepare.outputs.tag }} --out D:\out --meta meta
       - shell: pwsh
         run: New-Item -ItemType Directory facts -Force | Out-Null; Copy-Item D:\out\*.facts.json facts\
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with: { name: meta-npm, path: "meta\n facts", retention-days: 3 }
 
   crates:
@@ -163,7 +163,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 180
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: build the local registry
         run: |
           args=(--out out/crates --facts out/crates.facts.json)
@@ -173,7 +173,7 @@ jobs:
       - name: upload
         run: python3 scripts/upload-assets.py --tag ${{ needs.prepare.outputs.tag }} --out out --meta meta
       - run: mkdir -p facts && cp out/*.facts.json facts/
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with: { name: meta-crates, path: "meta\n facts", retention-days: 3 }
 
   wheels:
@@ -184,8 +184,8 @@ jobs:
       fail-fast: false
       matrix: { platform: [windows, linux] }
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with: { python-version: '3.14' }
       - name: download the wheelhouse
         run: |
@@ -196,7 +196,7 @@ jobs:
       - name: upload
         run: python scripts/upload-assets.py --tag ${{ needs.prepare.outputs.tag }} --out out --meta meta
       - run: mkdir -p facts && cp out/*.facts.json facts/
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with: { name: "meta-wheels-${{ matrix.platform }}", path: "meta\n facts", retention-days: 3 }
 
   nuget:
@@ -204,8 +204,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 300
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
         with: { dotnet-version: '10.0.x' }
       - name: build the NuGet feed
         run: |
@@ -216,14 +216,14 @@ jobs:
       - name: upload
         run: python3 scripts/upload-assets.py --tag ${{ needs.prepare.outputs.tag }} --out out --meta meta
       - run: mkdir -p facts && cp out/*.facts.json facts/
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with: { name: meta-nuget, path: "meta\n facts", retention-days: 3 }
 
   vscode:
     needs: prepare
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: fetch the extensions from Open VSX
         run: |
           python3 scripts/fetch-vscode-extensions.py --out out/vscode-extensions --facts out/vscode-extensions.facts.json
@@ -231,7 +231,7 @@ jobs:
       - name: upload
         run: python3 scripts/upload-assets.py --tag ${{ needs.prepare.outputs.tag }} --out out --meta meta
       - run: mkdir -p facts && cp out/*.facts.json facts/
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with: { name: meta-vscode, path: "meta\n facts", retention-days: 3 }
 
   wsl:
@@ -239,21 +239,23 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: build the distro in a chroot
         run: sudo -E bash scripts/build-distro.sh --out out/wsl-distro.tar.gz && sudo chown -R "$(id -u):$(id -g)" out
       - name: upload
         run: python3 scripts/upload-assets.py --tag ${{ needs.prepare.outputs.tag }} --out out --meta meta
       - run: mkdir -p facts && cp out/*.facts.json facts/
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with: { name: meta-wsl, path: "meta\n facts", retention-days: 3 }
 
   manifest:
     needs: [prepare, dtk, tools, rust, python, npm, crates, wheels, nuget, vscode, wsl]
+    # a quick run goes on with whatever built, so the install tests still run; a real build needs every job
+    if: ${{ always() && needs.prepare.result == 'success' && needs.dtk.result == 'success' && needs.tools.result == 'success' && (inputs.quick || !contains(needs.*.result, 'failure')) }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
         with: { pattern: 'meta-*', path: collected }
       - name: dev-toolkit.json, SHA256SUMS.txt, VERSIONS.md
         run: |
@@ -263,11 +265,12 @@ jobs:
           ls meta facts
           python3 scripts/write-manifest.py --tag ${{ needs.prepare.outputs.tag }} --meta meta --facts facts --out release-meta --check-release
           gh release upload ${{ needs.prepare.outputs.tag }} release-meta/dev-toolkit.json release-meta/SHA256SUMS.txt release-meta/VERSIONS.md --clobber
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with: { name: release-meta, path: release-meta, retention-days: 7 }
 
   test-windows:
     needs: [prepare, manifest]
+    if: ${{ always() && needs.manifest.result == 'success' }}
     runs-on: windows-2022
     timeout-minutes: 240
     strategy:
@@ -282,7 +285,7 @@ jobs:
           - { name: dotnet, groups: 'core,dotnet', args: '', assets: 'scoop tools-core-* tools-dotnet-* nuget vscode-extensions' }
     name: test-windows (${{ matrix.name }})
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: download the release files this test needs
         shell: pwsh
         run: |
@@ -298,10 +301,11 @@ jobs:
 
   test-wsl:
     needs: [prepare, manifest]
+    if: ${{ always() && needs.manifest.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: download the distro and the caches it uses
         run: |
           gh release download ${{ needs.prepare.outputs.tag }} -D kit -p 'wsl-distro.tar.gz*' -p 'crates.zip*' -p 'wheels-linux.zip*' -p 'npm-cache.zip*' -p 'nuget.zip*'
@@ -314,9 +318,9 @@ jobs:
     if: ${{ !inputs.quick && inputs.publish != false }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with: { fetch-depth: 0 }
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with: { name: release-meta, path: release-meta }
       - name: publish
         run: |

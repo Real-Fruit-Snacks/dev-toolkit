@@ -59,14 +59,16 @@ Step 'RustSec advisory database (cargo audit --no-fetch, cargo deny --disable-fe
 git clone --depth 1 https://github.com/rustsec/advisory-db "$env:CARGO_HOME\advisory-db"
 if ($LASTEXITCODE) { throw 'advisory-db clone failed' }
 # cargo-deny keeps its own copy; let it fetch one into CARGO_HOME now
-$probe = Join-Path $Stage 'deny-probe'
-cargo new --quiet $probe
-Push-Location $probe
-cargo deny init 2>$null
-cargo deny fetch db
-if ($LASTEXITCODE) { Write-Host '::warning::cargo deny fetch db failed; cargo deny will need --disable-fetch and a db-path' }
-Pop-Location
-Remove-Item $probe -Recurse -Force
+if ($Tools -contains 'cargo-deny') {
+  $probe = Join-Path $Stage 'deny-probe'
+  cargo new --quiet $probe
+  Push-Location $probe
+  cargo deny init 2>$null
+  cargo deny fetch db
+  if ($LASTEXITCODE) { Write-Host '::warning::cargo deny fetch db failed; cargo deny will need --disable-fetch and a db-path' }
+  Pop-Location
+  Remove-Item $probe -Recurse -Force
+}
 
 Step 'trim'
 foreach ($d in 'registry', 'git', '.package-cache', '.global-cache') { Remove-Item "$env:CARGO_HOME\$d" -Recurse -Force -ErrorAction SilentlyContinue }

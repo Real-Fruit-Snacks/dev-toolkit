@@ -28,7 +28,8 @@ if (Test-Path $installs) { Remove-Item $installs -Recurse -Force }
 $env:UV_PYTHON_INSTALL_DIR = $installs
 & $uv.FullName python install $Version
 if ($LASTEXITCODE) { throw "uv python install $Version failed" }
-$dir = Get-ChildItem $installs -Directory | Where-Object Name -like "cpython-$Version*-windows-x86_64-none" | Select-Object -First 1
+# uv also makes a cpython-3.14-... alias; take the real folder, named with the full version
+$dir = Get-ChildItem $installs -Directory | Where-Object { $_.Name -match "^cpython-$([regex]::Escape($Version))\.\d+-windows-x86_64-none$" -and -not $_.LinkType } | Select-Object -First 1
 if (-not $dir) { throw "no cpython-$Version build in $installs" }
 $py = Join-Path $dir.FullName 'python.exe'
 

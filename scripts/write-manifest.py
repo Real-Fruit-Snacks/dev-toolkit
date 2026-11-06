@@ -73,7 +73,10 @@ def main() -> None:
         if g.get("apps"):
             missing += [x for x in (f"tools-{name}-scoop", f"tools-{name}-portable") if x not in meta]
         if missing:
-            problems.append(f"group {name} is missing assets: {', '.join(missing)}")
+            if g.get("required"):
+                sys.exit(f"the required group {name} is missing assets: {', '.join(missing)}")
+            problems.append(f"group {name} is left out: its assets didn't build ({', '.join(missing)})")
+            continue
         groups[name] = {
             "title": g.get("title", name),
             "required": bool(g.get("required")),

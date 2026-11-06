@@ -65,7 +65,7 @@ namespace DevToolkit
             {
                 var name = id.Substring(id.IndexOf('/') + 1);
                 var dir = Path.Combine(scoop, "apps", name, "current");
-                var ok = File.Exists(Path.Combine(dir, "install.json")) || File.Exists(Path.Combine(dir, "manifest.json"));
+                var ok = new[] { "scoop-install.json", "install.json", "scoop-manifest.json", "manifest.json" }.Any(f => File.Exists(Path.Combine(dir, f)));
                 if (ok) { ctx.AppDirs[name] = dir; Log.Ok(name); }
                 else { failed.Add(name); Log.Warn($"{name} didn't install through Scoop"); }
             }
