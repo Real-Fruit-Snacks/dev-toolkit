@@ -1,0 +1,19 @@
+# Seeds that scripts/build-wheels.py never tries, even when they rank in the top list.
+# Project names or fnmatch patterns, one per line. This only removes seeds: a package that another seed
+# depends on still comes in with it, or that seed is skipped by --max-mb.
+
+# NVIDIA CUDA runtimes and GPU-only builds: hundreds of MB each, and useless without an NVIDIA GPU and
+# driver. torch on Linux depends on them, so it goes over --max-mb and is skipped there as well.
+nvidia-*
+cuda-*
+*-cu11
+*-cu12
+*-cu13
+cupy-cuda*
+jax-cuda*
+tensorrt*
+onnxruntime-gpu
+triton
+
+# macOS-only bindings: there are no Windows or Linux wheels to find.
+pyobjc*

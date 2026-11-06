@@ -189,10 +189,11 @@ jobs:
         with: { python-version: '3.14' }
       - name: download the wheelhouse
         run: |
-          args=(--platform ${{ matrix.platform }} --out out/wheels --facts out/wheels-${{ matrix.platform }}.facts.json)
+          args=(--platform ${{ matrix.platform }} --out stage/wheels --exclude config/pypi-exclude.txt
+                --facts out/wheels-${{ matrix.platform }}.facts.json --zip out/wheels-${{ matrix.platform }}.zip --jobs 6)
           [ -n "$QUICK" ] && args+=(--top 30)
           python scripts/build-wheels.py "${args[@]}"
-          (cd out/wheels && zip -q -0 -r ../wheels-${{ matrix.platform }}.zip .) && rm -rf out/wheels
+          rm -rf stage/wheels ~/.cache/pip
       - name: upload
         run: python scripts/upload-assets.py --tag ${{ needs.prepare.outputs.tag }} --out out --meta meta
       - run: mkdir -p facts && cp out/*.facts.json facts/
