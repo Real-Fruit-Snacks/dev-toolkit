@@ -156,10 +156,20 @@ if ($selected -contains 'data') {
   Try-Cmd 'duckdb' 'duckdb -c "select 42 as answer"' | Out-Null
   $pg = Join-Path $work 'pg'
   if (Try-Cmd 'initdb' "initdb -D `"$pg`" -U postgres -A trust --no-locale -E UTF8") {
-    if (Try-Cmd 'pg_ctl start' "pg_ctl -D `"$pg`" -o `"-p 54329`" -l `"$work\pg.log`" -w start") {
+    # the server inherits pg_ctl's output handles and keeps them open until it stops, so pg_ctl writes to
+    # files here: reading its output through a pipe would wait for the server to exit
+    $ctlExe = (Get-Command pg_ctl -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1).Source
+    $ctl = Start-Process -FilePath $ctlExe -NoNewWindow -PassThru -RedirectStandardOutput "$work\pg_ctl.out" `
+      -RedirectStandardError "$work\pg_ctl.err" -ArgumentList "-D `"$pg`" -o `"-p 54329`" -l `"$work\pg.log`" -w -t 60 start"
+    $null = $ctl.Handle   # keeps the exit code readable
+    $started = $ctl.WaitForExit(120000) -and $ctl.ExitCode -eq 0
+    if ($started) {
+      Pass 'pg_ctl start'
       Try-Cmd 'psql' 'psql -h 127.0.0.1 -p 54329 -U postgres -c "select version();"' | Out-Null
-      cmd /d /c "pg_ctl -D `"$pg`" -m fast -w stop" | Out-Null
+    } else {
+      Fail 'pg_ctl start' ((Get-Content "$work\pg_ctl.out", "$work\pg_ctl.err", "$work\pg.log" -ErrorAction SilentlyContinue) -join "`n")
     }
+    cmd /d /c "pg_ctl -D `"$pg`" -m fast -w -t 60 stop >nul 2>&1"
   }
 }
 
