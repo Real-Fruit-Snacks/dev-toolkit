@@ -1,0 +1,100 @@
+{
+  "buckets": {
+    "main": "https://github.com/ScoopInstaller/Main",
+    "extras": "https://github.com/ScoopInstaller/Extras",
+    "versions": "https://github.com/ScoopInstaller/Versions",
+    "nerd-fonts": "https://github.com/matthewjberger/scoop-nerd-fonts"
+  },
+  "groups": {
+    "core": {
+      "title": "Shell, Git, editor and command-line tools",
+      "required": true,
+      "apps": [
+        { "app": "main/7zip", "check": "7z i" },
+        { "app": "main/git", "check": "git --version" },
+        { "app": "main/gh", "check": "gh --version" },
+        { "app": "main/pwsh", "check": "pwsh -NoLogo -NoProfile -Command $PSVersionTable.PSVersion.ToString()" },
+        { "app": "extras/windows-terminal", "where": "wt.exe" },
+        { "app": "extras/vscode", "where": "code" },
+        { "app": "main/ripgrep", "check": "rg --version" },
+        { "app": "main/fd", "check": "fd --version" },
+        { "app": "main/fzf", "check": "fzf --version" },
+        { "app": "main/jq", "check": "jq --version" },
+        { "app": "main/yq", "check": "yq --version" },
+        { "app": "main/bat", "check": "bat --version" },
+        { "app": "main/delta", "check": "delta --version" },
+        { "app": "extras/lazygit", "check": "lazygit --version" },
+        { "app": "main/just", "check": "just --version" },
+        { "app": "main/hyperfine", "check": "hyperfine --version" },
+        { "app": "main/starship", "check": "starship --version" },
+        { "app": "main/neovim", "check": "nvim --version" },
+        { "app": "main/less", "check": "less --version" },
+        { "app": "nerd-fonts/JetBrainsMono-NF", "font": "JetBrainsMono" }
+      ],
+      "extensions": [
+        "editorconfig.editorconfig",
+        "usernamehw.errorlens",
+        "redhat.vscode-yaml",
+        "ms-vscode.powershell",
+        "streetsidesoftware.code-spell-checker"
+      ]
+    },
+    "rust": {
+      "title": "Rust: stable MSVC and GNU toolchains, cargo tools, popular crates",
+      "assets": ["rust-toolchain", "crates"],
+      "apps": [],
+      "extensions": ["rust-lang.rust-analyzer", "vadimcn.vscode-lldb", "tamasfe.even-better-toml"]
+    },
+    "python": {
+      "title": "Python 3.14 with uv and popular packages",
+      "assets": ["python", "wheels-windows"],
+      "apps": [
+        { "app": "main/uv", "check": "uv --version" }
+      ],
+      "extensions": ["ms-python.python", "ms-python.debugpy", "detachhead.basedpyright", "charliermarsh.ruff", "ms-toolsai.jupyter"]
+    },
+    "node": {
+      "title": "Node.js LTS and popular npm packages",
+      "assets": ["npm-cache"],
+      "apps": [
+        { "app": "main/nodejs-lts", "check": "node --version" }
+      ],
+      "extensions": ["dbaeumer.vscode-eslint", "esbenp.prettier-vscode"]
+    },
+    "dotnet": {
+      "title": ".NET SDK (LTS) and popular NuGet packages",
+      "assets": ["nuget"],
+      "apps": [
+        { "app": "versions/dotnet-sdk-lts", "check": "dotnet --version" }
+      ],
+      "extensions": ["muhammad-sammy.csharp"]
+    },
+    "cpp": {
+      "title": "C and C++: LLVM-MinGW, CMake, Ninja, Make",
+      "apps": [
+        { "app": "main/mingw-mstorsjo-llvm-ucrt", "check": "clang --version" },
+        { "app": "main/cmake", "check": "cmake --version" },
+        { "app": "main/ninja", "check": "ninja --version" },
+        { "app": "main/make", "check": "make --version" }
+      ],
+      "extensions": ["llvm-vs-code-extensions.vscode-clangd", "ms-vscode.cmake-tools"]
+    },
+    "data": {
+      "title": "Databases and data: SQLite, DuckDB, PostgreSQL, DBeaver",
+      "apps": [
+        { "app": "main/sqlite", "check": "sqlite3 --version" },
+        { "app": "main/duckdb", "check": "duckdb --version" },
+        { "app": "main/postgresql", "check": "pg_ctl --version" },
+        { "app": "extras/dbeaver", "where": "dbeaver" }
+      ],
+      "extensions": []
+    },
+    "wsl": {
+      "title": "Ubuntu for WSL with the same languages, using the Windows-side caches",
+      "optional": true,
+      "assets": ["wsl-distro", "wheels-linux"],
+      "apps": [],
+      "extensions": []
+    }
+  }
+}
