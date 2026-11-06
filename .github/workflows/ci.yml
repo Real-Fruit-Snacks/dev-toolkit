@@ -1,0 +1,50 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  installer:
+    name: dtk.exe (build + mini kit)
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - name: build
+        run: dotnet build installer\dtk.csproj -c Release -o build
+      - name: install, run and uninstall a tiny release in a sandbox profile
+        run: python tests\mini-kit.py --dtk build\dtk.exe --work D:\mini
+      - name: dtk check on a clean runner
+        run: build\dtk.exe check
+
+  scripts:
+    name: scripts parse
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Python
+        run: python3 -m py_compile scripts/*.py tests/*.py
+      - name: shell
+        run: |
+          for f in scripts/*.sh tests/*.sh wsl/provision.sh wsl/dev-toolkit-link; do [ -f "$f" ] && bash -n "$f" && echo "ok $f"; done
+          shellcheck -S warning scripts/*.sh tests/*.sh wsl/provision.sh wsl/dev-toolkit-link || true
+      - name: PowerShell
+        shell: pwsh
+        run: |
+          $bad = 0
+          foreach ($f in Get-ChildItem scripts, tests -Filter *.ps1) {
+            $errs = $null
+            [void][System.Management.Automation.Language.Parser]::ParseFile($f.FullName, [ref]$null, [ref]$errs)
+            if ($errs) { $bad++; $errs | ForEach-Object { "$($f.Name): $($_.Message)" } } else { "ok $($f.Name)" }
+          }
+          if ($bad) { exit 1 }
+      - name: config
+        run: python3 -c "import json; json.load(open('config/groups.json'))" && echo ok
+      - name: wording
+        run: |
+          # published text says "offline"
+          if grep -rniE 'air[- ]?gap' --exclude-dir=.git . ; then echo 'say "offline" instead'; exit 1; fi
