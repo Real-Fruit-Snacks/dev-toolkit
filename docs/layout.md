@@ -22,7 +22,7 @@ joined on disk. `SHA256SUMS.txt` lists every uploaded file, parts included.
 | `SHA256SUMS.txt`, `VERSIONS.md` | publish job | Hashes of every file; versions of everything inside |
 | `scoop.zip` | `scripts/collect-tools.ps1` | `core/` (Scoop itself), `buckets/<name>/` (git checkouts at the pinned commit) |
 | `tools-<group>-scoop.zip` | `scripts/collect-tools.ps1` | Scoop's download cache for the group's apps, file names exactly as Scoop writes them |
-| `tools-<group>-portable.zip` | `scripts/collect-tools.ps1` | `apps/<app>/...` installed trees and `portable.json` (see below) |
+| `tools-<group>-portable.zip` | `scripts/collect-tools.ps1` | `apps/<app>/...` installed trees and `portable.json` (see below); core also carries `shims/shim.exe` (Scoop's shim) and `vcruntime/` (the Visual C++ runtime DLLs from Visual Studio's redistributable folder) |
 | `rust-toolchain.zip` | `scripts/build-rust.ps1` | `rustup/` (RUSTUP_HOME) and `cargo/` (CARGO_HOME, with `bin/` and `advisory-db/`) |
 | `crates.zip` | `scripts/build-crates.py` | A Cargo local registry: `index/` (sparse-index layout, only the included versions) plus `<name>-<version>.crate` files at the root, stored uncompressed |
 | `python.zip` | `scripts/build-python.ps1` | `cpython-3.14.<n>-windows-x86_64-none/` from python-build-standalone |
@@ -70,6 +70,7 @@ otherwise:
 ```
 <root>\scoop\            Scoop route: SCOOP, with apps\, buckets\, cache\, shims\, persist\
 <root>\portable\         Portable route: apps\<app>\ and shims\
+<root>\vcruntime\        Visual C++ runtime DLLs, on PATH (Windows prefers its own copy when it has one)
 <root>\rust\rustup\      RUSTUP_HOME
 <root>\rust\cargo\       CARGO_HOME (bin\ on PATH, config.toml written here)
 <root>\rust\gnu-shims\   libgcc_eh.a (LLVM-MinGW's libunwind) and an empty libgcc.a, for the GNU target

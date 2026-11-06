@@ -153,6 +153,8 @@ Logs go to <root>\install.log. Nothing here needs admin.";
 
             try
             {
+                // before any tool runs, Scoop's install scripts included
+                VcRuntime.Install(ctx);
                 var withApps = groups.Where(g => g.Apps.Count > 0).ToList();
                 if (route == "scoop")
                 {
@@ -214,6 +216,24 @@ Logs go to <root>\install.log. Nothing here needs admin.";
             if (!File.Exists(ctx.Rec.FilePath)) throw new UserError($"Nothing to undo: {ctx.Rec.FilePath} doesn't exist.");
             Log.OpenFile(Path.Combine(ctx.P.LocalAppData, "dev-toolkit-uninstall.log"));
             Log.Head($"Undoing the dev-toolkit install in {ctx.Root}");
+
+            // Scoop's own uninstall removes what it made outside the folder: its shortcuts, fonts, registry entries.
+            var scoop = ScoopRoute.Dir(ctx);
+            var scoopPs1 = Path.Combine(scoop, @"apps\scoop\current\bin\scoop.ps1");
+            var ps = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), @"WindowsPowerShell\v1.0\powershell.exe");
+            if (ctx.Rec.Data.Str("route") == "scoop" && File.Exists(scoopPs1) && !ctx.P.Sandbox)
+            {
+                var apps = Directory.GetDirectories(Path.Combine(scoop, "apps")).Select(Path.GetFileName)
+                    .Where(n => !n.Equals("scoop", StringComparison.OrdinalIgnoreCase)).ToList();
+                if (apps.Count > 0)
+                {
+                    Log.Info($"scoop uninstall {apps.Count} apps");
+                    var r = Proc.Run(ps, "-NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File " + Proc.Q(scoopPs1) +
+                        " uninstall --purge " + string.Join(" ", apps.Select(Proc.Q)), ctx, timeoutMs: 3600000,
+                        extraEnv: new Dictionary<string, string> { ["SCOOP"] = scoop });
+                    if (!r.Ok) Log.Warn($"scoop uninstall exited with {r.Code}; carrying on: {r.Tail(3)}");
+                }
+            }
 
             foreach (var kv in ctx.Rec.Vars)
             {

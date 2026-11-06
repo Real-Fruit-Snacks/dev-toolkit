@@ -265,6 +265,26 @@ namespace DevToolkit
         }
     }
 
+    /// <summary>
+    /// The Visual C++ runtime DLLs (Microsoft's redistributable set). Many tools need them, and a machine
+    /// without the VC++ redistributable installed (which takes admin) can't start them. They go in a folder on
+    /// PATH: Windows still prefers its own copy in System32 when there is one.
+    /// </summary>
+    static class VcRuntime
+    {
+        public static void Install(Ctx ctx)
+        {
+            if (!ctx.Kit.Has("tools-core-portable")) return;
+            var dir = Path.Combine(ctx.Root, "vcruntime");
+            var n = ctx.Kit.Extract("tools-core-portable", dir, name => name.StartsWith("vcruntime/") ? name.Substring(10) : null);
+            if (n == 0) return;
+            ctx.Env.AddPath(dir);
+            var sys = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "vcruntime140.dll");
+            Log.Ok(File.Exists(sys) ? "Visual C++ runtime: Windows has its own; the kit's copy is a fallback"
+                                    : "Visual C++ runtime: not installed on this machine, so the kit's copy is on PATH");
+        }
+    }
+
     /// <summary>Reads and sets a program's PE subsystem (2 = GUI, 3 = console), as Scoop does for its shims.</summary>
     static class Pe
     {

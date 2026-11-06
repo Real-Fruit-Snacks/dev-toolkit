@@ -193,12 +193,23 @@ foreach ($g in $groups) {
     $entries += [ordered]@{ name = $name; version = $ver; bins = @($bins); paths = $paths; env = $envs; shortcuts = @($shortcuts); rewrite = $rewrite; fonts = $fonts; roots = $roots }
   }
   if ($gname -eq 'core') {
-    New-Item -ItemType Directory -Force -Path "$gp\shims" | Out-Null
+    New-Item -ItemType Directory -Force -Path "$gp\shims", "$gp\vcruntime" | Out-Null
     Copy-Item "$coreDir\supporting\shims\kiennq\shim.exe" "$gp\shims\shim.exe"
+    # The Visual C++ runtime, from Visual Studio's redistributable folder (the files Microsoft lets
+    # applications ship next to themselves). Many of the tools need it; installing it system-wide takes admin.
+    $vs = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -property installationPath
+    $crt = Get-ChildItem "$vs\VC\Redist\MSVC" -Directory -ErrorAction SilentlyContinue |
+      Where-Object Name -match '^\d+(\.\d+)+$' | Sort-Object { [version]$_.Name } -Descending |
+      ForEach-Object { Get-ChildItem "$($_.FullName)\x64" -Directory -Filter 'Microsoft.VC*.CRT' -ErrorAction SilentlyContinue } |
+      Select-Object -First 1
+    if (-not $crt) { throw "no Visual C++ redistributable folder under $vs\VC\Redist\MSVC" }
+    Copy-Item "$($crt.FullName)\*.dll" "$gp\vcruntime\"
+    $facts.vcruntime = [ordered]@{ from = $crt.FullName; version = (Get-Item "$gp\vcruntime\vcruntime140.dll").VersionInfo.ProductVersion; files = @(Get-ChildItem "$gp\vcruntime" | ForEach-Object Name) }
+    Write-Host "Visual C++ runtime $($facts.vcruntime.version): $($facts.vcruntime.files -join ', ')"
   }
   [ordered]@{ apps = $entries } | ConvertTo-Json -Depth 10 | Set-Content "$gp\portable.json" -Encoding utf8NoBOM
   Push-Location $gp
-  $items = @('apps', 'portable.json') + @(if (Test-Path shims) { 'shims' })
+  $items = @('apps', 'portable.json') + @(if (Test-Path shims) { 'shims' }) + @(if (Test-Path vcruntime) { 'vcruntime' })
   & $sevenZip a -tzip -mx=5 -mmt=on -bso0 -bsp0 (Join-Path $Out "tools-$gname-portable.zip") @items
   if ($LASTEXITCODE) { throw "7z failed for tools-$gname-portable.zip" }
   Pop-Location

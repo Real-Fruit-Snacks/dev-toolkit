@@ -343,14 +343,36 @@ namespace DevToolkit
             File.WriteAllText(path, text, new UTF8Encoding(false));
         }
 
+        /// <summary>Deletes a folder tree. Junctions and symlinks (Scoop's persist links) are removed, never followed.</summary>
         public static void DeleteTree(string dir)
         {
-            if (!Directory.Exists(Long(dir))) return;
-            foreach (var f in Directory.EnumerateFiles(Long(dir), "*", SearchOption.AllDirectories))
+            var d = new DirectoryInfo(Long(dir));
+            if (d.Exists) DeleteDir(d);
+        }
+
+        static void DeleteDir(DirectoryInfo d)
+        {
+            if ((d.Attributes & FileAttributes.ReparsePoint) == 0)
             {
-                try { File.SetAttributes(f, FileAttributes.Normal); } catch { }
+                foreach (var f in d.EnumerateFiles())
+                {
+                    f.Attributes = FileAttributes.Normal;
+                    Retry(f.Delete);
+                }
+                foreach (var sub in d.EnumerateDirectories()) DeleteDir(sub);
             }
-            Directory.Delete(Long(dir), true);
+            d.Attributes &= ~(FileAttributes.ReadOnly | FileAttributes.System | FileAttributes.Hidden);
+            Retry(() => d.Delete(false));
+        }
+
+        static void Retry(Action a)
+        {
+            for (int i = 0; ; i++)
+            {
+                try { a(); return; }
+                catch (IOException) when (i < 3) { System.Threading.Thread.Sleep(1000); }
+                catch (UnauthorizedAccessException) when (i < 3) { System.Threading.Thread.Sleep(1000); }
+            }
         }
 
         public static string Size(long bytes)
