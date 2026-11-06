@@ -33,6 +33,15 @@ function Exec([string]$user, [string[]]$cmd) {
   return $LASTEXITCODE
 }
 
+# some runners come up with the Docker service stopped
+docker version --format '{{.Server.Version}}' 2>$null | Out-Null
+if ($LASTEXITCODE) {
+  Step 'starting the Docker service'
+  Start-Service docker
+  $deadline = (Get-Date).AddMinutes(5)
+  do { Start-Sleep 5; docker version --format '{{.Server.Version}}' 2>$null | Out-Null } while ($LASTEXITCODE -and (Get-Date) -lt $deadline)
+  if ($LASTEXITCODE) { throw 'the Docker service did not start' }
+}
 docker rm -f $Name 2>$null | Out-Null
 Step "container $Name (no network)"
 docker run -d --name $Name --network none --storage-opt size=120G `
