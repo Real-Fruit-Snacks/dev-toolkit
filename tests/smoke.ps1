@@ -131,9 +131,9 @@ if ($selected -contains 'node') {
 if ($selected -contains 'dotnet') {
   Head '.NET: projects restored from the local feed'
   Try-Cmd 'dotnet' 'dotnet --version' | Out-Null
-  if (Try-Cmd 'dotnet new console' 'dotnet new console -o con') {
-    Try-Cmd 'dotnet add package Newtonsoft.Json' 'dotnet add con package Newtonsoft.Json' | Out-Null
-    Try-Cmd 'dotnet run' 'dotnet run --project con' | Out-Null
+  if (Try-Cmd 'dotnet new console' 'dotnet new console -o hello') {
+    Try-Cmd 'dotnet add package Newtonsoft.Json' 'dotnet add hello package Newtonsoft.Json' | Out-Null
+    Try-Cmd 'dotnet run' 'dotnet run --project hello' | Out-Null
   }
   if (Try-Cmd 'dotnet new webapi' 'dotnet new webapi -o api') { Try-Cmd 'dotnet build webapi' 'dotnet build api' | Out-Null }
   if (Try-Cmd 'dotnet new xunit' 'dotnet new xunit -o tests') { Try-Cmd 'dotnet test' 'dotnet test tests' | Out-Null }

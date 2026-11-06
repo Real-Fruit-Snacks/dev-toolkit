@@ -19,7 +19,16 @@ whole() {
   ls "$f".part* >/dev/null 2>&1 || { echo "missing $1" >&2; exit 1; }
   # shellcheck disable=SC2046
   cat $(ls "$f".part* | sort -V) > "$W/$1"
+  [ -z "${CONSUME_KIT:-}" ] || rm -f "$f".part*
   echo "$W/$1"
+}
+
+# Unzips an asset, then drops the joined copy (and, with CONSUME_KIT=1, the download) to save disk.
+unpack() {
+  local z; z="$(whole "$1")"
+  unzip -q "$z" -d "$2"
+  if [ "$z" = "$W/$1" ] || [ -n "${CONSUME_KIT:-}" ]; then rm -f "$z"; fi
+  df -h "$W" | tail -1
 }
 
 cleanup() {
@@ -29,13 +38,14 @@ trap cleanup EXIT
 rm -rf "$W"; mkdir -p "$ROOTFS" "$CACHES/wheels"
 
 echo "== distro"
-tar -xzf "$(whole wsl-distro.tar.gz)" -C "$ROOTFS"
+distro="$(whole wsl-distro.tar.gz)"
+tar -xzf "$distro" -C "$ROOTFS"
+if [ "$distro" = "$W/wsl-distro.tar.gz" ] || [ -n "${CONSUME_KIT:-}" ]; then rm -f "$distro"; fi
 echo "== caches, laid out as dtk.exe lays them out"
-unzip -q "$(whole crates.zip)" -d "$CACHES/crates"
-unzip -q "$(whole wheels-linux.zip)" -d "$CACHES/wheels/linux"
-unzip -q "$(whole npm-cache.zip)" -d "$CACHES/npm-cache"
-unzip -q "$(whole nuget.zip)" -d "$CACHES/nuget"
-rm -f "$W"/*.zip "$W"/*.tar.gz
+unpack crates.zip "$CACHES/crates"
+unpack wheels-linux.zip "$CACHES/wheels/linux"
+unpack npm-cache.zip "$CACHES/npm-cache"
+unpack nuget.zip "$CACHES/nuget"
 # files under /mnt/c belong to the WSL user, so let dev write where the tools write
 chmod -R a+rwX "$CACHES"
 

@@ -322,12 +322,18 @@ jobs:
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v7
+      - name: make room (the caches unpack to about 25 GB)
+        run: |
+          df -h / /mnt
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache /usr/local/share/boost /usr/local/.ghcup
+          sudo mkdir -p /mnt/kit /mnt/wsl-smoke && sudo chown "$USER" /mnt/kit
+          df -h / /mnt
       - name: download the distro and the caches it uses
         run: |
-          gh release download ${{ needs.prepare.outputs.tag }} -D kit -p 'wsl-distro.tar.gz*' -p 'crates.zip*' -p 'wheels-linux.zip*' -p 'npm-cache.zip*' -p 'nuget.zip*'
-          ls -la kit
+          gh release download ${{ needs.prepare.outputs.tag }} -D /mnt/kit -p 'wsl-distro.tar.gz*' -p 'crates.zip*' -p 'wheels-linux.zip*' -p 'npm-cache.zip*' -p 'nuget.zip*'
+          ls -la /mnt/kit
       - name: offline tests inside the distro
-        run: sudo bash tests/wsl-smoke.sh kit
+        run: sudo WORK=/mnt/wsl-smoke CONSUME_KIT=1 bash tests/wsl-smoke.sh /mnt/kit
 
   publish:
     needs: [prepare, manifest, test-windows, test-wsl]
