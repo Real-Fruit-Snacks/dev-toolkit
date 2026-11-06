@@ -25,10 +25,10 @@ dtk uninstall                      undo every setting it changed and delete the 
 dtk exec -- cargo build            run a command with the environment a new terminal would get
 ```
 
-This is what `install.cmd` printed in a test build's run, in a Windows container with no network, as a user who isn't an administrator, with PowerShell scripts limited to signed ones by group policy (trimmed where it says so):
+This is what `install.cmd` printed in the v1.0.0 build's test, in a Windows container with no network, as a user who isn't an administrator, with PowerShell scripts limited to signed ones by group policy and only the core, C and C++, and database files in the folder (trimmed where it says so):
 
 ```text
-dtk 0.0.4: installing dev-toolkit quick-42162014231 into C:\Users\ContainerUser\AppData\Local\dev-toolkit
+dtk 1.0.0: installing dev-toolkit v1.0.0 into C:\Users\ContainerUser\AppData\Local\dev-toolkit
 == This machine
   ok   Windows               Windows Server 2022 Datacenter build 20348.5773, 64-bit
   ok   Programs from         a program copied to C:\Users\ContainerUser\AppData\Local\dev-toolkit\.probe runs
@@ -37,16 +37,24 @@ dtk 0.0.4: installing dev-toolkit quick-42162014231 into C:\Users\ContainerUser\
   info   MachinePolicy       AllSigned
   info C++ linker (MSVC)     no Visual Studio C++ tools -> Rust uses the GNU toolchain
   info WSL                   WSL isn't turned on (wsl --status failed)
+  info Long paths            off (dtk works around it; some tools may hit the 260-character limit)
   info Free space            119.8 GB on C:\ (install folder C:\Users\ContainerUser\AppData\Local\dev-toolkit)
+== This release (v1.0.0, in C:\mnt\kit\)
+  ok   core                  Shell, Git, editor, a C compiler and command-line tools (978 MB)
+  NO   rust                  Rust: stable MSVC and GNU toolchains, cargo tools, popular crates: missing rust-toolchain.zip, crates.zip
+  (4 more groups whose files weren't copied over)
+  ok   cpp                   C and C++ builds: CMake, Ninja, Make (the compiler, LLVM-MinGW, is in core) (51 MB)
+  ok   data                  Databases and data: SQLite, DuckDB, PostgreSQL, DBeaver (503 MB)
 == Verdict
    ok    Install will use the ready-unpacked tools (no Scoop; PowerShell scripts can't run here). Everything else is the same.
    The WSL group will be skipped: WSL isn't turned on, and turning it on needs admin.
 == Plan: portable route; groups core, cpp, data
+   release files for this install: 1.5 GB; expect about 3.7 GB installed
 == Checking the files against SHA256SUMS.txt
-   checked 4 files, 1.7 GB in 2s
+   checked 4 files, 1.7 GB in 1s
    ok    Visual C++ runtime: not installed on this machine, so the kit's copy is on PATH
 == Ready-unpacked tools: core
-     25,114 files, 2.7 GB in 54s
+     25,114 files, 2.8 GB in 21s
    ok    7zip 26.05
    ok    git 2.56.0.4
    (19 more, all ok)
@@ -56,7 +64,7 @@ dtk 0.0.4: installing dev-toolkit quick-42162014231 into C:\Users\ContainerUser\
    (4 apps, all ok)
 == VS Code
    (7 extensions, all ok)
-== Done in 2.2 minutes
+== Done in 1.0 minutes
    Open a NEW terminal so it picks up the new PATH. Tools that are already open keep the old one.
 ```
 
@@ -86,6 +94,18 @@ Either way, an app that fails to install through Scoop falls back to its unpacke
 | wsl | Ubuntu 24.04 with Rust, Python, Node and .NET, pointed at the same caches | `wsl-distro.tar.gz*`, `wheels-linux.zip` |
 
 The `wsl` group goes in only when WSL is already turned on, since turning it on needs admin. Inside it, Rust, npm and NuGet use the Windows-side caches, so install those groups too to get them.
+
+## What a release holds
+
+v1.0.0 is 23.5 GiB in 35 files. Besides the tools and VS Code extensions:
+
+- **Rust 1.99.1** for MSVC and GNU, with cargo-nextest, cargo-deny, cargo-audit, cargo-expand and bacon, the RustSec advisory database, and 4,078 crates in 8,723 versions.
+- **Python 3.14.10** and uv, with 2,194 Windows wheels covering 1,930 of PyPI's most downloaded projects, and 2,184 Linux wheels for WSL.
+- **Node.js 26.13.0** LTS, with an npm cache of 7,428 packages that 2,049 of the most used ones need, native builds included.
+- **.NET SDK 10.0.403**, with a NuGet feed of 1,331 packages in 2,649 versions.
+- **Ubuntu 24.04.5** for WSL, with the same languages inside.
+
+Every version, and every file's SHA-256, is in [VERSIONS.md](VERSIONS.md) and the release's `SHA256SUMS.txt`.
 
 ## Working offline
 
