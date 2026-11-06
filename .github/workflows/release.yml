@@ -205,13 +205,22 @@ jobs:
     timeout-minutes: 300
     steps:
       - uses: actions/checkout@v7
+      - name: the SDK the kit ships
+        id: sdk
+        # runtime, ILLink and Crossgen packs in the feed must match the SDK on the offline machine exactly
+        run: |
+          v=$(curl -fsSL https://raw.githubusercontent.com/ScoopInstaller/Versions/master/bucket/dotnet-sdk-lts.json | python3 -c 'import json,sys; print(json.load(sys.stdin)["version"])')
+          echo "version=$v" >> "$GITHUB_OUTPUT"; echo ".NET SDK $v"
       - uses: actions/setup-dotnet@v6
-        with: { dotnet-version: '10.0.x' }
+        with: { dotnet-version: '${{ steps.sdk.outputs.version }}' }
       - name: build the NuGet feed
         run: |
-          args=(--out out/nuget --facts out/nuget.facts.json)
+          echo '{ "sdk": { "version": "${{ steps.sdk.outputs.version }}", "rollForward": "disable" } }' > global.json
+          dotnet --version
+          args=(--out out/nuget --facts out/nuget.facts.json --work nuget-work)  # under global.json, so the pinned SDK builds every project
           [ -n "$QUICK" ] && args+=(--top 20)
           python3 scripts/build-nuget-feed.py "${args[@]}"
+          rm -rf nuget-work
           (cd out/nuget && zip -q -0 -r ../nuget.zip .) && rm -rf out/nuget
       - name: upload
         run: python3 scripts/upload-assets.py --tag ${{ needs.prepare.outputs.tag }} --out out --meta meta

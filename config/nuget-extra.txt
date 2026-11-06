@@ -1,0 +1,325 @@
+# Extra seeds for scripts/build-nuget-feed.py, added to the most downloaded packages on nuget.org.
+# Every seed is restored with all of its dependencies, so list the packages people add by hand.
+#
+#   Id              latest stable version
+#   Id 1.2.3        exactly that version (it also replaces the version taken from the top list)
+#   Id 1.2.*        latest stable version starting with 1.2.
+#   !Pattern        drop matching ids from the top list (* and ? are wildcards). Ids listed on their
+#                   own line above still go in. The comment after the pattern is the recorded reason.
+#
+# Text after # is a comment.
+
+# --- Data access -------------------------------------------------------------------------------
+Microsoft.EntityFrameworkCore
+Microsoft.EntityFrameworkCore.SqlServer
+Microsoft.EntityFrameworkCore.Sqlite
+Microsoft.EntityFrameworkCore.InMemory
+Microsoft.EntityFrameworkCore.Design
+Microsoft.EntityFrameworkCore.Tools
+Microsoft.EntityFrameworkCore.Proxies
+Microsoft.EntityFrameworkCore.Cosmos
+Npgsql.EntityFrameworkCore.PostgreSQL
+Pomelo.EntityFrameworkCore.MySql
+Oracle.EntityFrameworkCore
+EFCore.NamingConventions
+Microsoft.Data.SqlClient
+Microsoft.Data.Sqlite
+Npgsql
+MySqlConnector
+Oracle.ManagedDataAccess.Core
+DuckDB.NET.Data.Full
+Dapper
+LiteDB
+MongoDB.Driver
+StackExchange.Redis
+Microsoft.Extensions.Caching.StackExchangeRedis
+Microsoft.Extensions.Caching.Hybrid
+FluentMigrator
+FluentMigrator.Runner
+dbup-core
+dbup-sqlserver
+dbup-postgresql
+
+# --- Logging and observability ----------------------------------------------------------------
+Serilog
+Serilog.AspNetCore
+Serilog.Extensions.Hosting
+Serilog.Extensions.Logging
+Serilog.Settings.Configuration
+Serilog.Sinks.Console
+Serilog.Sinks.File
+Serilog.Sinks.Async
+Serilog.Sinks.Debug
+Serilog.Sinks.Seq
+Serilog.Sinks.MSSqlServer
+Serilog.Sinks.OpenTelemetry
+Serilog.Formatting.Compact
+Serilog.Expressions
+Serilog.Enrichers.Environment
+Serilog.Enrichers.Thread
+Serilog.Enrichers.Process
+Serilog.Exceptions
+NLog
+NLog.Extensions.Logging
+NLog.Web.AspNetCore
+log4net
+OpenTelemetry
+OpenTelemetry.Extensions.Hosting
+OpenTelemetry.Instrumentation.AspNetCore
+OpenTelemetry.Instrumentation.Http
+OpenTelemetry.Instrumentation.Runtime
+OpenTelemetry.Exporter.OpenTelemetryProtocol
+OpenTelemetry.Exporter.Console
+prometheus-net
+prometheus-net.AspNetCore
+AspNetCore.HealthChecks.SqlServer
+AspNetCore.HealthChecks.NpgSql
+AspNetCore.HealthChecks.Redis
+AspNetCore.HealthChecks.UI.Client
+Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore
+
+# --- Resilience and HTTP clients --------------------------------------------------------------
+Polly
+Polly.Core
+Polly.Extensions
+Microsoft.Extensions.Http.Polly
+Microsoft.Extensions.Http.Resilience
+Microsoft.Extensions.Resilience
+Refit
+Refit.HttpClientFactory
+RestSharp
+Flurl.Http
+
+# --- Application structure --------------------------------------------------------------------
+MediatR 12.*                  # 12.x is Apache-2.0; 13 and later are RPL-1.5 or a paid licence
+FluentValidation
+FluentValidation.DependencyInjectionExtensions
+FluentValidation.AspNetCore
+AutoMapper 14.*               # 14.x is MIT; 15 and later are RPL-1.5 or a paid licence
+Mapster
+Mapster.DependencyInjection
+Riok.Mapperly
+Scrutor
+Autofac
+Autofac.Extensions.DependencyInjection
+Ardalis.GuardClauses
+Ardalis.Result
+Ardalis.Specification
+ErrorOr
+OneOf
+CSharpFunctionalExtensions
+Stateless
+Humanizer
+NodaTime
+NodaTime.Serialization.SystemTextJson
+Microsoft.FeatureManagement.AspNetCore
+Quartz
+Quartz.Extensions.Hosting
+Hangfire.Core
+Hangfire.AspNetCore
+Hangfire.SqlServer
+Coravel
+Microsoft.Extensions.Hosting
+Microsoft.Extensions.Hosting.WindowsServices
+Microsoft.Extensions.Hosting.Systemd
+Microsoft.Extensions.Http
+Microsoft.Extensions.Configuration.Json
+Microsoft.Extensions.Configuration.UserSecrets
+Microsoft.Extensions.Configuration.EnvironmentVariables
+Microsoft.Extensions.Configuration.CommandLine
+Microsoft.Extensions.Options.DataAnnotations
+Microsoft.Extensions.Caching.Memory
+
+# --- Messaging --------------------------------------------------------------------------------
+MassTransit 8.*               # 8.x is Apache-2.0; 9 and later need a paid licence
+MassTransit.Abstractions 8.*
+MassTransit.RabbitMQ 8.*
+MassTransit.EntityFrameworkCore 8.*
+MassTransit.Azure.ServiceBus.Core 8.*
+RabbitMQ.Client
+Confluent.Kafka
+Azure.Messaging.ServiceBus
+
+# --- Web and APIs -----------------------------------------------------------------------------
+Swashbuckle.AspNetCore
+Swashbuckle.AspNetCore.Annotations
+Microsoft.AspNetCore.OpenApi
+Scalar.AspNetCore
+NSwag.AspNetCore
+Asp.Versioning.Http
+Asp.Versioning.Mvc
+Asp.Versioning.Mvc.ApiExplorer
+Microsoft.AspNetCore.Authentication.JwtBearer
+Microsoft.AspNetCore.Authentication.OpenIdConnect
+Microsoft.AspNetCore.Authentication.Negotiate
+Microsoft.Identity.Web
+Microsoft.AspNetCore.Identity.EntityFrameworkCore
+Microsoft.AspNetCore.Identity.UI
+Microsoft.AspNetCore.Diagnostics.EntityFrameworkCore
+Microsoft.AspNetCore.SignalR.Client
+Microsoft.AspNetCore.Mvc.NewtonsoftJson
+Microsoft.AspNetCore.Mvc.Razor.RuntimeCompilation
+Microsoft.AspNetCore.SpaProxy
+Microsoft.AspNetCore.Components.QuickGrid
+Microsoft.AspNetCore.Components.QuickGrid.EntityFrameworkAdapter
+Microsoft.VisualStudio.Web.CodeGeneration.Design
+Yarp.ReverseProxy
+Carter
+FastEndpoints
+HotChocolate.AspNetCore
+Grpc.AspNetCore
+Grpc.Net.Client
+Grpc.Net.ClientFactory
+Grpc.Tools
+Google.Protobuf
+
+# --- Files, formats and utilities -------------------------------------------------------------
+Newtonsoft.Json
+YamlDotNet
+CsvHelper
+ClosedXML
+DocumentFormat.OpenXml
+ExcelDataReader
+ExcelDataReader.DataSet
+MiniExcel
+NPOI 2.7.*                    # 2.7.x is Apache-2.0; 2.8 binaries need a maintenance fee
+PdfPig
+PDFsharp 6.2.*                # 6.2.x is MIT; 6.3 and later are AGPL-3.0
+PDFsharp-MigraDoc 6.2.*
+Markdig
+HtmlAgilityPack
+AngleSharp
+MessagePack
+protobuf-net
+SharpZipLib
+SharpCompress
+SkiaSharp
+SkiaSharp.NativeAssets.Linux
+QRCoder
+MimeKit
+MailKit
+SSH.NET
+FluentFTP
+BCrypt.Net-Next
+BouncyCastle.Cryptography
+System.IO.Abstractions
+TestableIO.System.IO.Abstractions.TestingHelpers
+System.Reactive
+System.Linq.Async
+System.CommandLine
+Spectre.Console
+Spectre.Console.Cli
+CommandLineParser
+Scriban
+MathNet.Numerics
+PolySharp
+
+# --- Testing ----------------------------------------------------------------------------------
+Microsoft.NET.Test.Sdk
+xunit
+xunit.v3
+xunit.runner.visualstudio
+NUnit
+NUnit3TestAdapter
+NUnit.Analyzers
+MSTest
+MSTest.TestFramework
+MSTest.TestAdapter
+MSTest.Sdk
+Microsoft.Testing.Extensions.CodeCoverage
+Microsoft.Testing.Extensions.TrxReport
+TUnit
+Moq
+NSubstitute
+NSubstitute.Analyzers.CSharp
+FakeItEasy
+AutoFixture
+AutoFixture.Xunit2
+AutoFixture.AutoMoq
+AutoFixture.AutoNSubstitute
+Bogus
+Shouldly
+AwesomeAssertions
+FluentAssertions 7.*          # 7.x is Apache-2.0; 8 and later are free for non-commercial use only
+Verify.Xunit
+coverlet.collector
+coverlet.msbuild
+ReportGenerator
+Microsoft.AspNetCore.Mvc.Testing
+Microsoft.AspNetCore.TestHost
+Microsoft.Extensions.TimeProvider.Testing
+Testcontainers
+Testcontainers.PostgreSql
+Testcontainers.MsSql
+WireMock.Net
+Respawn
+Microsoft.Playwright
+Selenium.WebDriver
+Selenium.Support
+BenchmarkDotNet
+
+# --- Analyzers and build ----------------------------------------------------------------------
+Microsoft.SourceLink.GitHub
+MinVer
+Nerdbank.GitVersioning
+StyleCop.Analyzers
+Roslynator.Analyzers
+Meziantou.Analyzer
+
+# --- Desktop ----------------------------------------------------------------------------------
+CommunityToolkit.Mvvm
+Microsoft.Xaml.Behaviors.Wpf
+MaterialDesignThemes
+MahApps.Metro
+Microsoft.Web.WebView2
+Avalonia
+Avalonia.Desktop
+Avalonia.Themes.Fluent
+Avalonia.Fonts.Inter
+Avalonia.Templates             # dotnet new install Avalonia.Templates
+
+# --- .NET tools (dotnet tool install) ---------------------------------------------------------
+dotnet-ef
+dotnet-outdated-tool
+csharpier
+dotnet-reportgenerator-globaltool
+dotnet-counters
+dotnet-trace
+dotnet-dump
+dotnet-script
+dotnet-aspnet-codegenerator
+
+# --- Left out: the current licence does not allow free use (or only for some users) ----------
+!MassTransit*                  # MassTransit 9 and later: paid licence (8.x is pinned above)
+!EPPlus*                       # EPPlus 5 and later: PolyForm Noncommercial, paid licence for commercial use
+!QuestPDF*                     # free Community licence only below a revenue threshold, paid otherwise
+!SixLabors.*                   # Six Labors Split License: paid for commercial use above a revenue threshold
+!EFCore.BulkExtensions*        # dual licence: paid above a revenue threshold
+!Duende.IdentityServer*        # commercial licence
+!Duende.BFF*                   # commercial licence
+!NServiceBus*                  # RPL-1.5 or a paid licence
+!Particular.*                  # RPL-1.5 or a paid licence (NServiceBus platform)
+!Syncfusion.*                  # commercial licence
+!BoldReports.*                 # commercial licence (Syncfusion)
+!Aspose.*                      # commercial licence
+!Telerik.*                     # commercial licence
+!DevExpress.*                  # commercial licence
+!GrapeCity.*                   # commercial licence
+!MESCIUS.*                     # commercial licence
+!Spire.*                       # commercial licence
+!IronPdf*                      # commercial licence
+!IronOcr*                      # commercial licence
+!IronBarCode*                  # commercial licence
+!IronXL*                       # commercial licence
+!IronSoftware.*                # commercial licence
+!GemBox.*                      # commercial licence; the free mode is size-limited
+!Xceed.*                       # Xceed Community License: non-commercial use only
+!Extended.Wpf.Toolkit          # Xceed Community License: non-commercial use only
+!DocX                          # Xceed Community License: non-commercial use only
+!PostSharp*                    # commercial licence
+!Metalama*                     # commercial licence
+!Z.EntityFramework.Extensions* # commercial licence (ZZZ Projects)
+!Z.Dapper.Plus                 # commercial licence (ZZZ Projects)
+!Z.BulkOperations              # commercial licence (ZZZ Projects)
+!ServiceStack*                 # commercial licence; the free build has usage quotas
+!Newtonsoft.Json.Schema        # AGPL-3.0 or paid; the free build stops after 1,000 validations an hour
