@@ -35,6 +35,7 @@ namespace DevToolkit
             cfg.AppendLine();
             cfg.AppendLine("[net]");
             cfg.AppendLine("offline = true");
+            GnuLinking(ctx, rust, cfg);
             ConfigFiles.WriteOwned(ctx, Path.Combine(cargoHome, "config.toml"), cfg.ToString());
 
             // MSVC if Microsoft's linker works here, GNU (which links on its own) if not.
@@ -46,6 +47,43 @@ namespace DevToolkit
             if (v.Ok) Log.Ok($"{v.Out.Trim()} (default toolchain {toolchain})");
             else ctx.Problems.Add("rustc --version failed: " + v.Tail(5));
             ctx.Rec.Set("rustToolchain", toolchain);
+        }
+
+        /// <summary>
+        /// Points Rust's GNU target at LLVM-MinGW. On its own the GNU toolchain links only trivial programs:
+        /// windows-sys 0.60+ (pulled in by tokio, clap and most of the ecosystem) needs an external dlltool, and
+        /// the cc crate needs a C compiler. With LLVM-MinGW merely on PATH, rustc picks its gcc wrapper and fails
+        /// on -lgcc_eh / -lgcc, so: clang as the linker, LLVM's dlltool, and two stand-in libraries (libunwind
+        /// as libgcc_eh, an empty libgcc). Binaries come out on UCRT with libunwind linked in: no extra DLLs.
+        /// A RUSTFLAGS environment variable replaces these rustflags, so leave it unset.
+        /// </summary>
+        static void GnuLinking(Ctx ctx, string rust, StringBuilder cfg)
+        {
+            var llvm = ctx.AppDir("mingw-mstorsjo-llvm-ucrt");
+            if (llvm == null || !File.Exists(Path.Combine(llvm, "bin", "x86_64-w64-mingw32-clang.exe")))
+            {
+                Log.Warn("LLVM-MinGW isn't installed, so the GNU Rust toolchain can only build simple programs");
+                return;
+            }
+            var shims = Path.Combine(rust, "gnu-shims");
+            Directory.CreateDirectory(shims);
+            var unwind = Path.Combine(llvm, "x86_64-w64-mingw32", "lib", "libunwind.a");
+            if (File.Exists(unwind)) File.Copy(unwind, Path.Combine(shims, "libgcc_eh.a"), true);
+            else Log.Warn("LLVM-MinGW has no libunwind.a; Rust programs that unwind may not link with the GNU toolchain");
+            File.WriteAllBytes(Path.Combine(shims, "libgcc.a"), Encoding.ASCII.GetBytes("!<arch>\n"));
+
+            string Bin(string exe) => ConfigFiles.TomlLit(Path.Combine(llvm, "bin", exe));
+            cfg.AppendLine();
+            cfg.AppendLine("# The GNU target links through LLVM-MinGW (see the dev-toolkit README).");
+            cfg.AppendLine("[target.x86_64-pc-windows-gnu]");
+            cfg.AppendLine("linker = " + Bin("x86_64-w64-mingw32-clang.exe"));
+            cfg.AppendLine("rustflags = ['-C', " + ConfigFiles.TomlLit("dlltool=" + Path.Combine(llvm, "bin", "dlltool.exe")) +
+                           ", '-C', " + ConfigFiles.TomlLit("link-arg=-L" + shims) + "]");
+            cfg.AppendLine();
+            cfg.AppendLine("[env]");
+            cfg.AppendLine("CC_x86_64_pc_windows_gnu = " + Bin("x86_64-w64-mingw32-clang.exe"));
+            cfg.AppendLine("CXX_x86_64_pc_windows_gnu = " + Bin("x86_64-w64-mingw32-clang++.exe"));
+            cfg.AppendLine("AR_x86_64_pc_windows_gnu = " + Bin("llvm-ar.exe"));
         }
 
         /// <summary>Compiles an empty program with the MSVC toolchain: the only reliable way to know the linker works.</summary>

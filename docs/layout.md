@@ -24,7 +24,7 @@ joined on disk. `SHA256SUMS.txt` lists every uploaded file, parts included.
 | `tools-<group>-scoop.zip` | `scripts/collect-tools.ps1` | Scoop's download cache for the group's apps, file names exactly as Scoop writes them |
 | `tools-<group>-portable.zip` | `scripts/collect-tools.ps1` | `apps/<app>/...` installed trees and `portable.json` (see below) |
 | `rust-toolchain.zip` | `scripts/build-rust.ps1` | `rustup/` (RUSTUP_HOME) and `cargo/` (CARGO_HOME, with `bin/` and `advisory-db/`) |
-| `crates.zip` | `scripts/build-crates.py` | A Cargo local registry: `index/` plus `<name>-<version>.crate` files at the root |
+| `crates.zip` | `scripts/build-crates.py` | A Cargo local registry: `index/` (sparse-index layout, only the included versions) plus `<name>-<version>.crate` files at the root, stored uncompressed |
 | `python.zip` | `scripts/build-python.ps1` | `cpython-3.14.<n>-windows-x86_64-none/` from python-build-standalone |
 | `wheels-windows.zip` | `scripts/build-wheels.py` | Flat `.whl` files for CPython 3.14 on win_amd64, plus pure-Python wheels |
 | `wheels-linux.zip` | `scripts/build-wheels.py` | Flat `.whl` files for CPython 3.14 on manylinux x86_64, plus pure-Python wheels (a complete set on its own) |
@@ -72,6 +72,7 @@ otherwise:
 <root>\portable\         Portable route: apps\<app>\ and shims\
 <root>\rust\rustup\      RUSTUP_HOME
 <root>\rust\cargo\       CARGO_HOME (bin\ on PATH, config.toml written here)
+<root>\rust\gnu-shims\   libgcc_eh.a (LLVM-MinGW's libunwind) and an empty libgcc.a, for the GNU target
 <root>\crates\           Cargo local registry
 <root>\python\<build>\   Python 3.14 (it and its Scripts\ on PATH)
 <root>\wheels\windows\   pip and uv find-links
@@ -86,7 +87,7 @@ Config it writes (only keys it owns; existing files are merged, never replaced):
 
 | File | Settings |
 |---|---|
-| `<root>\rust\cargo\config.toml` | crates-io replaced by the local registry; `net.offline = true`; GNU linker path |
+| `<root>\rust\cargo\config.toml` | crates-io replaced by the local registry; `net.offline = true`; for the GNU target: LLVM-MinGW's clang as linker, its dlltool, `-L<root>\rust\gnu-shims`, and `CC`/`CXX`/`AR` in `[env]` |
 | `%APPDATA%\pip\pip.ini` | `no-index`, `find-links`, `disable-pip-version-check` |
 | `%APPDATA%\uv\uv.toml` | `offline`, `no-index`, `find-links`, `python-downloads = "never"` |
 | `%USERPROFILE%\.npmrc` | `cache`, `offline`, `audit=false`, `fund=false`, `update-notifier=false` |

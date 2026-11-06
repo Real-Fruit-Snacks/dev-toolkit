@@ -69,18 +69,29 @@ if ($selected -contains 'rust') {
   Try-Cmd 'rustup default' 'rustup default' | Out-Null
   if (Try-Cmd 'cargo new' 'cargo new --quiet hello') {
     $p = Join-Path $work 'hello'
-    Try-Cmd 'cargo add serde (derive), serde_json, anyhow' 'cargo add serde --features derive && cargo add serde_json anyhow' $p | Out-Null
+    # clap pulls in windows-sys (raw-dylib imports); cc compiles C in build.rs: the two things the GNU
+    # toolchain can't do without LLVM-MinGW
+    Try-Cmd 'cargo add serde, serde_json, anyhow, clap; cc as a build dependency' 'cargo add serde --features derive && cargo add serde_json anyhow && cargo add clap --features derive && cargo add --build cc' $p | Out-Null
     Set-Content (Join-Path $p 'src\main.rs') @'
+use clap::Parser;
 use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize, Debug)]
 struct Point { x: i32, y: i32 }
+#[derive(Parser)]
+struct Args { #[arg(long, default_value_t = 2)] times: i32 }
+unsafe extern "C" { fn triple(x: i32) -> i32; }
 fn main() -> anyhow::Result<()> {
+    let args = Args::parse();
     let p: Point = serde_json::from_str(r#"{"x":1,"y":2}"#)?;
-    println!("rust ok {:?}", p);
+    println!("rust ok {:?}, C says {}", p, unsafe { triple(args.times) });
     Ok(())
 }
 '@
-    Try-Cmd 'cargo run (offline)' 'cargo run --quiet' $p | Out-Null
+    Set-Content (Join-Path $p 'build.rs') 'fn main() { cc::Build::new().file("src/triple.c").compile("triple"); }'
+    Set-Content (Join-Path $p 'src\triple.c') '#include <stdio.h>
+int triple(int x) { return 3 * x; }'
+    Try-Cmd 'cargo run (offline: deps, windows-sys, C via cc)' 'cargo run --quiet' $p | Out-Null
+    Try-Cmd 'cargo build --release' 'cargo build --quiet --release' $p | Out-Null
     Try-Cmd 'cargo clippy' 'cargo clippy --quiet' $p | Out-Null
   }
   foreach ($t in 'cargo nextest --version', 'cargo audit --version', 'cargo deny --version', 'bacon --version', 'cargo expand --version') { Try-Cmd $t $t | Out-Null }

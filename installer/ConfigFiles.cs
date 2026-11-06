@@ -136,7 +136,8 @@ namespace DevToolkit
             Fs.WriteText(path, Json.Write(cur));
         }
 
-        /// <summary>A TOML literal string: no escapes, so Windows paths go in as-is.</summary>
-        public static string TomlLit(string s) => "'" + s + "'";
+        /// <summary>A TOML string for a path: a literal string (no escapes) unless it holds a quote, as in O'Brien.</summary>
+        public static string TomlLit(string s) =>
+            s.IndexOf('\'') < 0 ? "'" + s + "'" : "\"" + s.Replace("\\", "\\\\").Replace("\"", "\\\"") + "\"";
     }
 }

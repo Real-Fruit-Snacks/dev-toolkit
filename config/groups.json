@@ -7,11 +7,12 @@
   },
   "groups": {
     "core": {
-      "title": "Shell, Git, editor and command-line tools",
+      "title": "Shell, Git, editor, a C compiler and command-line tools",
       "required": true,
       "apps": [
         { "app": "main/7zip", "check": "7z i" },
         { "app": "main/git", "check": "git --version" },
+        { "app": "main/mingw-mstorsjo-llvm-ucrt", "check": "clang --version" },
         { "app": "main/gh", "check": "gh --version" },
         { "app": "main/pwsh", "check": "pwsh -NoLogo -NoProfile -Command $PSVersionTable.PSVersion.ToString()" },
         { "app": "extras/windows-terminal", "where": "wt.exe" },
@@ -71,9 +72,8 @@
       "extensions": ["muhammad-sammy.csharp"]
     },
     "cpp": {
-      "title": "C and C++: LLVM-MinGW, CMake, Ninja, Make",
+      "title": "C and C++ builds: CMake, Ninja, Make (the compiler, LLVM-MinGW, is in core)",
       "apps": [
-        { "app": "main/mingw-mstorsjo-llvm-ucrt", "check": "clang --version" },
         { "app": "main/cmake", "check": "cmake --version" },
         { "app": "main/ninja", "check": "ninja --version" },
         { "app": "main/make", "check": "make --version" }
