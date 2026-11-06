@@ -137,22 +137,40 @@ namespace DevToolkit
         /// <summary>Settings that keep VS Code and the bundled extensions from reaching for the network.</summary>
         static Dictionary<string, object> VsCodeOfflineSettings(Ctx ctx)
         {
+            // Measured against a proxy that refuses everything: these take VS Code from about 96 outgoing
+            // requests at startup to 6 (fixed CDN URLs no setting turns off).
             var s = new Dictionary<string, object>
             {
                 ["update.mode"] = "none",
                 ["update.showReleaseNotes"] = false,
+                ["telemetry.telemetryLevel"] = "off",
+                ["telemetry.feedback.enabled"] = false,
+                ["workbench.enableExperiments"] = false,
+                ["workbench.settings.enableNaturalLanguageSearch"] = false,
                 ["extensions.autoUpdate"] = false,
                 ["extensions.autoCheckUpdates"] = false,
                 ["extensions.ignoreRecommendations"] = true,
-                ["telemetry.telemetryLevel"] = "off",
-                ["workbench.enableExperiments"] = false,
-                ["workbench.settings.enableNaturalLanguageSearch"] = false,
-                ["npm.fetchOnlinePackageInfo"] = false,
+                ["chat.disableAIFeatures"] = true,
                 ["json.schemaDownload.enable"] = false,
-                ["redhat.telemetry.enabled"] = false,
+                ["npm.fetchOnlinePackageInfo"] = false,
+                ["js/ts.tsserver.automaticTypeAcquisition.enabled"] = false,
+                ["typescript.disableAutomaticTypeAcquisition"] = true,
+                // C#: use the bundled Roslyn server; OmniSharp isn't in the extension and would be downloaded
+                ["dotnet.server.useOmnisharp"] = false,
+                ["dotnetAcquisitionExtension.enableTelemetry"] = false,
+                // Python: basedpyright is the language server (Pylance isn't redistributable)
+                ["python.languageServer"] = "None",
+                ["python.locator"] = "js",
+                ["python.useEnvironmentsExtension"] = false,
+                ["python.experiments.enabled"] = false,
+                ["jupyter.experiments.enabled"] = false,
+                ["jupyter.widgetScriptSources"] = new object[0],
                 ["yaml.schemaStore.enable"] = false,
+                ["redhat.telemetry.enabled"] = false,
+                ["evenBetterToml.schema.catalogs"] = new object[0],
+                ["powershell.promptToUpdatePowerShell"] = false,
                 ["clangd.checkUpdates"] = false,
-                ["clangd.onConfigChanged"] = "restart",
+                ["lldb.suppressUpdateNotifications"] = true,
             };
             if (ctx.AppDirs.TryGetValue("python", out var py)) s["python.defaultInterpreterPath"] = Path.Combine(py, "python.exe");
             var llvm = ctx.AppDir("mingw-mstorsjo-llvm-ucrt");

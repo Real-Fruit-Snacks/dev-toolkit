@@ -181,13 +181,25 @@ def render_versions(tag: str, m: dict, meta: dict, facts: dict, problems: list) 
         L += ["## .NET", "", f"- NuGet feed: {nu.get('package_count', nu.get('packages', '?'))} packages, {nu.get('version_count', nu.get('versions', '?'))} versions (SDK {nu.get('sdk', '?')}, {nu.get('tfm', '?')})", ""]
     wsl = facts.get("wsl-distro")
     if wsl:
-        L += ["## WSL distro", ""] + [f"- {k}: {v}" for k, v in wsl.items() if k not in ("built", "size")] + [""]
+        tools_ = wsl.get("tools") or {}
+        L += ["## WSL distro", "",
+              f"- Ubuntu {wsl.get('ubuntu')} ({(wsl.get('image') or {}).get('name', '')}), default user `{wsl.get('user', 'dev')}`",
+              f"- Rust {wsl.get('rust')}, Python {wsl.get('python')} (uv {wsl.get('uv')}), Node {wsl.get('node')} (npm {wsl.get('npm')}), .NET SDK {wsl.get('dotnetSdk')}",
+              "- " + ", ".join(f"{k} {v}" for k, v in tools_.items()), ""]
     vs = facts.get("vscode-extensions")
     if vs and isinstance(vs.get("extensions"), list):
-        L += ["## VS Code extensions (from Open VSX)", "", "| Extension | Version | Licence |", "|---|---|---|"]
+        L += ["## VS Code extensions", "", "From Open VSX, except CodeLLDB, which is its maker's self-contained Windows build from GitHub.", "",
+              "| Extension | Version | Licence |", "|---|---|---|"]
+        copyleft = []
         for e in vs["extensions"]:
-            L.append(f"| {e.get('id')} | {e.get('version')} | {e.get('license', '')} |")
+            lic = e.get("licenceDetected") or e.get("licence") or e.get("license", "")
+            L.append(f"| {e.get('id')} | {e.get('version')} | {lic} |")
+            if "GPL" in str(lic).upper():
+                ns, _, name = str(e.get("id")).partition(".")
+                copyleft.append(f"- {e.get('id')} is {lic}; its source is linked from https://open-vsx.org/extension/{ns}/{name}")
         L.append("")
+        if copyleft:
+            L += copyleft + [""]
     L += ["## Files", "", "| Asset | Size | Files |", "|---|---|---|"]
     for k, v in sorted(meta.items()):
         L.append(f"| {k} | {mib(v['size'])} | {len(v['files'])} |")

@@ -226,7 +226,10 @@ jobs:
       - uses: actions/checkout@v7
       - name: fetch the extensions from Open VSX
         run: |
-          python3 scripts/fetch-vscode-extensions.py --out out/vscode-extensions --facts out/vscode-extensions.facts.json
+          # only extension releases the kit's VS Code accepts
+          v=$(curl -fsSL https://raw.githubusercontent.com/ScoopInstaller/Extras/master/bucket/vscode.json | python3 -c 'import json,sys; print(json.load(sys.stdin)["version"])')
+          echo "VS Code $v"
+          python3 scripts/fetch-vscode-extensions.py --out out/vscode-extensions --facts out/vscode-extensions.facts.json --vscode-version "$v"
           (cd out/vscode-extensions && zip -q -0 -r ../vscode-extensions.zip .) && rm -rf out/vscode-extensions
       - name: upload
         run: python3 scripts/upload-assets.py --tag ${{ needs.prepare.outputs.tag }} --out out --meta meta
