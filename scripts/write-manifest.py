@@ -92,7 +92,7 @@ def main() -> None:
         "repo": REPO,
         "groups": groups,
         "assets": {k: {"files": v["files"], "size": v["size"]} for k, v in sorted(meta.items())},
-        "facts": facts,
+        "facts": {k: trim(v) for k, v in facts.items()},
     }
     mf = out / "dev-toolkit.json"
     mf.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
@@ -144,6 +144,15 @@ def check_release(tag: str, meta: dict) -> None:
     print(f"all {sum(len(v['sha256']) for v in meta.values())} uploaded files match GitHub's digests")
 
 
+def trim(v):
+    """The facts without their long lists (every seed, every wheel): the manifest keeps the counts."""
+    if isinstance(v, dict):
+        return {k: trim(x) for k, x in v.items() if not (isinstance(x, list) and len(x) > 50)}
+    if isinstance(v, list):
+        return [trim(x) for x in v]
+    return v
+
+
 def render_versions(tag: str, m: dict, meta: dict, facts: dict, problems: list) -> str:
     L = [f"# dev-toolkit {tag}", "", f"Built {m['built']} by the weekly release workflow. Every file and its SHA-256 is in `SHA256SUMS.txt`.", ""]
     tools = facts.get("tools", {})
@@ -171,11 +180,14 @@ def render_versions(tag: str, m: dict, meta: dict, facts: dict, problems: list) 
         for plat in ("windows", "linux"):
             w = facts.get(f"wheels-{plat}")
             if w:
-                L.append(f"- {plat} wheels: {w.get('wheel_count', w.get('wheels', '?'))} files")
+                seeds = w.get("seeds") if isinstance(w.get("seeds"), dict) else {}
+                L.append(f"- {plat} wheels: {w.get('wheels', '?')} files for {seeds.get('ok', '?')} of PyPI's most downloaded projects and what they depend on")
         L.append("")
     npm = facts.get("npm-cache")
     if npm:
-        L += ["## Node.js", "", f"- npm cache: {npm.get('seeds_ok', npm.get('ok', '?'))} packages requested and their dependencies", ""]
+        seeds = npm.get("seeds") if isinstance(npm.get("seeds"), dict) else {}
+        cache = npm.get("cache") if isinstance(npm.get("cache"), dict) else {}
+        L += ["## Node.js", "", f"- npm cache: {cache.get('packages', '?')} packages ({cache.get('tarballs', '?')} tarballs), from {seeds.get('ok', '?')} of npm's most used packages and their dependencies, with native builds for win32-x64 and linux-x64", ""]
     nu = facts.get("nuget")
     if nu:
         L += ["## .NET", "", f"- NuGet feed: {nu.get('package_count', nu.get('packages', '?'))} packages, {nu.get('version_count', nu.get('versions', '?'))} versions (SDK {nu.get('sdk', '?')}, {nu.get('tfm', '?')})", ""]
