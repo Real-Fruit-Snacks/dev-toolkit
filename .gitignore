@@ -1,0 +1,9 @@
+# Built assets ship as GitHub release assets, not in git.
+release/
+stage/
+out/
+bin/
+obj/
+*.log
+__pycache__/
+.vs/
