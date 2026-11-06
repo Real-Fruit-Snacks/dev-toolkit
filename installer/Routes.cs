@@ -19,10 +19,13 @@ namespace DevToolkit
                 else list.Add($"tools-{g.Name}-portable");
             }
             list.AddRange(g.Assets);
-            if (g.Extensions.Count > 0) list.Add("vscode-extensions");
             if (g.Required && route == "scoop") list.Add($"tools-{g.Name}-portable"); // shim.exe and the per-app fallback
             return list.Distinct().ToList();
         }
+
+        /// <summary>Assets that are used when present but don't stop an install when missing.</summary>
+        public static List<string> OptionalFor(IEnumerable<Group> groups) =>
+            groups.Any(g => g.Extensions.Count > 0) ? new List<string> { "vscode-extensions" } : new List<string>();
     }
 
     /// <summary>

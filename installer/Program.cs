@@ -129,6 +129,12 @@ Logs go to <root>\install.log. Nothing here needs admin.";
             if (checks.FreeBytes >= 0 && checks.FreeBytes < want && !force)
                 throw new UserError($"Not enough space: about {Fs.Size(want)} needed, {Fs.Size(checks.FreeBytes)} free on {Path.GetPathRoot(ctx.Root)}. Free some up, pick another drive with --root, or install fewer groups.");
 
+            foreach (var opt in Planner.OptionalFor(groups))
+            {
+                if (ctx.Kit.Has(opt)) needed.Add(opt);
+                else Log.Warn($"{opt} isn't here, so that part is skipped ({string.Join(", ", ctx.Kit.MissingFiles(opt))})");
+            }
+
             var verified = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             if (!a.Flag("skip-verify"))
             {
