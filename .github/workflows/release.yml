@@ -1,0 +1,348 @@
+name: release
+
+# Builds every release asset, uploads them to a draft, installs the draft offline as a non-admin user in
+# Windows containers (and the WSL distro in a network-less chroot), and publishes only if all of it passes.
+
+on:
+  schedule:
+    - cron: '0 8 * * 0'        # Sundays 08:00 UTC
+  workflow_dispatch:
+    inputs:
+      quick:
+        description: Small caches and a throwaway draft, to test the pipeline (never publishes)
+        type: boolean
+        default: false
+      publish:
+        description: Publish when every test passes (false leaves a draft)
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ inputs.quick && 'quick' || 'main' }}
+  cancel-in-progress: false
+
+env:
+  # With a RELEASE_TOKEN secret (a fine-grained token with contents: write on this repo) releases are
+  # created by its owner; without it by github-actions[bot]. Commits always use the identity below.
+  GH_TOKEN: ${{ secrets.RELEASE_TOKEN || github.token }}
+  GH_REPO: ${{ github.repository }}
+  GIT_AUTHOR_NAME: Real-Fruit-Snacks
+  GIT_AUTHOR_EMAIL: 87195021+Real-Fruit-Snacks@users.noreply.github.com
+  GIT_COMMITTER_NAME: Real-Fruit-Snacks
+  GIT_COMMITTER_EMAIL: 87195021+Real-Fruit-Snacks@users.noreply.github.com
+  QUICK: ${{ inputs.quick && '1' || '' }}
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+      version: ${{ steps.tag.outputs.version }}
+    steps:
+      - name: pick the tag and open a draft
+        id: tag
+        run: |
+          if [ -n "$QUICK" ]; then
+            tag="quick-${{ github.run_id }}"; version="0.0.${{ github.run_number }}"
+          else
+            last=$(gh release list --exclude-drafts --limit 20 --json tagName -q '[.[].tagName | select(test("^v[0-9]+\\.[0-9]+\\.[0-9]+$"))][0]')
+            if [[ "$last" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+              tag="v${BASH_REMATCH[1]}.${BASH_REMATCH[2]}.$((BASH_REMATCH[3] + 1))"
+            else
+              tag="v1.0.0"
+            fi
+            version="${tag#v}"
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"; echo "version=$version" >> "$GITHUB_OUTPUT"
+          if gh release view "$tag" --json isDraft -q .isDraft 2>/dev/null | grep -q true; then
+            gh release delete "$tag" --yes --cleanup-tag
+          fi
+          gh release create "$tag" --draft --title "$tag" --target "${{ github.sha }}" --notes "Building..."
+          echo "draft $tag"
+
+  dtk:
+    needs: prepare
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - name: build dtk.exe
+        shell: pwsh
+        run: |
+          dotnet build installer\dtk.csproj -c Release -o build -p:Version=${{ needs.prepare.outputs.version }}
+          if ($LASTEXITCODE) { throw 'build failed' }
+          New-Item -ItemType Directory out | Out-Null
+          Copy-Item build\dtk.exe, installer\check.cmd, installer\install.cmd out\
+          .\out\dtk.exe version
+      - name: upload
+        run: python scripts/upload-assets.py --tag ${{ needs.prepare.outputs.tag }} --out out --meta meta
+      - uses: actions/upload-artifact@v4
+        with: { name: meta-dtk, path: meta, retention-days: 3 }
+
+  tools:
+    needs: prepare
+    runs-on: windows-2022
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - name: collect the Scoop apps
+        shell: pwsh
+        run: .\scripts\collect-tools.ps1 -Stage D:\stage -Out D:\out
+      - name: upload
+        run: python scripts/upload-assets.py --tag ${{ needs.prepare.outputs.tag }} --out D:\out --meta meta
+      - name: facts
+        shell: pwsh
+        run: New-Item -ItemType Directory facts -Force | Out-Null; Copy-Item D:\out\*.facts.json facts\
+      - uses: actions/upload-artifact@v4
+        with: { name: meta-tools, path: "meta\n facts", retention-days: 3 }
+
+  rust:
+    needs: prepare
+    runs-on: windows-2022
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - name: build the Rust toolchains
+        shell: pwsh
+        run: |
+          if ($env:QUICK) { .\scripts\build-rust.ps1 -Stage D:\stage -Out D:\out -Tools bacon -NoDocs }
+          else { .\scripts\build-rust.ps1 -Stage D:\stage -Out D:\out }
+      - name: upload
+        run: python scripts/upload-assets.py --tag ${{ needs.prepare.outputs.tag }} --out D:\out --meta meta
+      - shell: pwsh
+        run: New-Item -ItemType Directory facts -Force | Out-Null; Copy-Item D:\out\*.facts.json facts\
+      - uses: actions/upload-artifact@v4
+        with: { name: meta-rust, path: "meta\n facts", retention-days: 3 }
+
+  python:
+    needs: prepare
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - name: build python.zip
+        shell: pwsh
+        run: .\scripts\build-python.ps1 -Version 3.14 -Stage D:\stage -Out D:\out
+      - name: upload
+        run: python scripts/upload-assets.py --tag ${{ needs.prepare.outputs.tag }} --out D:\out --meta meta
+      - shell: pwsh
+        run: New-Item -ItemType Directory facts -Force | Out-Null; Copy-Item D:\out\*.facts.json facts\
+      - uses: actions/upload-artifact@v4
+        with: { name: meta-python, path: "meta\n facts", retention-days: 3 }
+
+  npm:
+    needs: prepare
+    runs-on: windows-2022
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '26' }
+      - name: seed the npm cache
+        shell: pwsh
+        run: |
+          $a = @('--cache', 'D:\out\npm-cache', '--facts', 'D:\out\npm-cache.facts.json')
+          if ($env:QUICK) { $a += @('--top', '30') }
+          node scripts\build-npm-cache.mjs @a
+          if ($LASTEXITCODE) { throw 'npm cache build failed' }
+          Push-Location D:\out\npm-cache
+          7z a -tzip -mx=0 -bso0 -bsp0 D:\out\npm-cache.zip *
+          if ($LASTEXITCODE) { throw '7z failed' }
+          Pop-Location
+          Remove-Item D:\out\npm-cache -Recurse -Force
+      - name: upload
+        run: python scripts/upload-assets.py --tag ${{ needs.prepare.outputs.tag }} --out D:\out --meta meta
+      - shell: pwsh
+        run: New-Item -ItemType Directory facts -Force | Out-Null; Copy-Item D:\out\*.facts.json facts\
+      - uses: actions/upload-artifact@v4
+        with: { name: meta-npm, path: "meta\n facts", retention-days: 3 }
+
+  crates:
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - name: build the local registry
+        run: |
+          args=(--out out/crates --facts out/crates.facts.json)
+          [ -n "$QUICK" ] && args+=(--top 40 --lines 1)
+          python3 scripts/build-crates.py "${args[@]}"
+          (cd out/crates && zip -q -0 -r ../crates.zip .) && rm -rf out/crates
+      - name: upload
+        run: python3 scripts/upload-assets.py --tag ${{ needs.prepare.outputs.tag }} --out out --meta meta
+      - run: mkdir -p facts && cp out/*.facts.json facts/
+      - uses: actions/upload-artifact@v4
+        with: { name: meta-crates, path: "meta\n facts", retention-days: 3 }
+
+  wheels:
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      matrix: { platform: [windows, linux] }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.14' }
+      - name: download the wheelhouse
+        run: |
+          args=(--platform ${{ matrix.platform }} --out out/wheels --facts out/wheels-${{ matrix.platform }}.facts.json)
+          [ -n "$QUICK" ] && args+=(--top 30)
+          python scripts/build-wheels.py "${args[@]}"
+          (cd out/wheels && zip -q -0 -r ../wheels-${{ matrix.platform }}.zip .) && rm -rf out/wheels
+      - name: upload
+        run: python scripts/upload-assets.py --tag ${{ needs.prepare.outputs.tag }} --out out --meta meta
+      - run: mkdir -p facts && cp out/*.facts.json facts/
+      - uses: actions/upload-artifact@v4
+        with: { name: "meta-wheels-${{ matrix.platform }}", path: "meta\n facts", retention-days: 3 }
+
+  nuget:
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with: { dotnet-version: '10.0.x' }
+      - name: build the NuGet feed
+        run: |
+          args=(--out out/nuget --facts out/nuget.facts.json)
+          [ -n "$QUICK" ] && args+=(--top 20)
+          python3 scripts/build-nuget-feed.py "${args[@]}"
+          (cd out/nuget && zip -q -0 -r ../nuget.zip .) && rm -rf out/nuget
+      - name: upload
+        run: python3 scripts/upload-assets.py --tag ${{ needs.prepare.outputs.tag }} --out out --meta meta
+      - run: mkdir -p facts && cp out/*.facts.json facts/
+      - uses: actions/upload-artifact@v4
+        with: { name: meta-nuget, path: "meta\n facts", retention-days: 3 }
+
+  vscode:
+    needs: prepare
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: fetch the extensions from Open VSX
+        run: |
+          python3 scripts/fetch-vscode-extensions.py --out out/vscode-extensions --facts out/vscode-extensions.facts.json
+          (cd out/vscode-extensions && zip -q -0 -r ../vscode-extensions.zip .) && rm -rf out/vscode-extensions
+      - name: upload
+        run: python3 scripts/upload-assets.py --tag ${{ needs.prepare.outputs.tag }} --out out --meta meta
+      - run: mkdir -p facts && cp out/*.facts.json facts/
+      - uses: actions/upload-artifact@v4
+        with: { name: meta-vscode, path: "meta\n facts", retention-days: 3 }
+
+  wsl:
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - name: build the distro in a chroot
+        run: sudo -E bash scripts/build-distro.sh --out out/wsl-distro.tar.gz && sudo chown -R "$(id -u):$(id -g)" out
+      - name: upload
+        run: python3 scripts/upload-assets.py --tag ${{ needs.prepare.outputs.tag }} --out out --meta meta
+      - run: mkdir -p facts && cp out/*.facts.json facts/
+      - uses: actions/upload-artifact@v4
+        with: { name: meta-wsl, path: "meta\n facts", retention-days: 3 }
+
+  manifest:
+    needs: [prepare, dtk, tools, rust, python, npm, crates, wheels, nuget, vscode, wsl]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { pattern: 'meta-*', path: collected }
+      - name: dev-toolkit.json, SHA256SUMS.txt, VERSIONS.md
+        run: |
+          mkdir -p meta facts
+          find collected -path '*/meta/*.json' -exec cp {} meta/ \;
+          find collected -name '*.facts.json' -exec cp {} facts/ \;
+          ls meta facts
+          python3 scripts/write-manifest.py --tag ${{ needs.prepare.outputs.tag }} --meta meta --facts facts --out release-meta --check-release
+          gh release upload ${{ needs.prepare.outputs.tag }} release-meta/dev-toolkit.json release-meta/SHA256SUMS.txt release-meta/VERSIONS.md --clobber
+      - uses: actions/upload-artifact@v4
+        with: { name: release-meta, path: release-meta, retention-days: 7 }
+
+  test-windows:
+    needs: [prepare, manifest]
+    runs-on: windows-2022
+    timeout-minutes: 240
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: scoop-tools, groups: 'core,cpp,data', args: '-ExpectRoute scoop -Uninstall', assets: 'scoop tools-core-* tools-cpp-* tools-data-* vscode-extensions' }
+          - { name: no-scripts, groups: 'core,cpp,data', args: '-StrictPolicy -ExpectRoute portable', assets: 'scoop tools-core-* tools-cpp-* tools-data-* vscode-extensions' }
+          - { name: rust, groups: 'core,rust', args: '', assets: 'scoop tools-core-* rust-toolchain crates vscode-extensions' }
+          - { name: python, groups: 'core,python', args: '', assets: 'scoop tools-core-* tools-python-* python wheels-windows vscode-extensions' }
+          - { name: node, groups: 'core,node', args: '', assets: 'scoop tools-core-* tools-node-* npm-cache vscode-extensions' }
+          - { name: dotnet, groups: 'core,dotnet', args: '', assets: 'scoop tools-core-* tools-dotnet-* nuget vscode-extensions' }
+    name: test-windows (${{ matrix.name }})
+    steps:
+      - uses: actions/checkout@v4
+      - name: download the release files this test needs
+        shell: pwsh
+        run: |
+          $tag = '${{ needs.prepare.outputs.tag }}'
+          $pats = @('dtk.exe', 'check.cmd', 'install.cmd', 'dev-toolkit.json', 'SHA256SUMS.txt')
+          foreach ($a in '${{ matrix.assets }}' -split ' ') { $pats += @("$a.zip", "$a.zip.part*") }
+          $p = @(); foreach ($x in $pats) { $p += @('-p', $x) }
+          gh release download $tag -D D:\kit @p --clobber
+          Get-ChildItem D:\kit | Format-Table Name, @{ n = 'MB'; e = { [math]::Round($_.Length / 1MB) } }
+      - name: install and test in a container (no network, not an admin)
+        shell: pwsh
+        run: .\tests\container.ps1 -Kit D:\kit -Groups '${{ matrix.groups }}' ${{ matrix.args }}
+
+  test-wsl:
+    needs: [prepare, manifest]
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - name: download the distro and the caches it uses
+        run: |
+          gh release download ${{ needs.prepare.outputs.tag }} -D kit -p 'wsl-distro.tar.gz*' -p 'crates.zip*' -p 'wheels-linux.zip*' -p 'npm-cache.zip*' -p 'nuget.zip*'
+          ls -la kit
+      - name: offline tests inside the distro
+        run: sudo bash tests/wsl-smoke.sh kit
+
+  publish:
+    needs: [prepare, manifest, test-windows, test-wsl]
+    if: ${{ !inputs.quick && inputs.publish != false }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: actions/download-artifact@v4
+        with: { name: release-meta, path: release-meta }
+      - name: publish
+        run: |
+          tag=${{ needs.prepare.outputs.tag }}
+          {
+            echo "Weekly build: developer tools for an offline Windows machine where you aren't an admin."
+            echo
+            echo "Download every file below into one folder, carry the folder over, and run \`check.cmd\`, then \`install.cmd\`."
+            echo "\`VERSIONS.md\` lists every version inside; \`SHA256SUMS.txt\` has the hash of every file."
+            echo
+            sed -n '/^## Left out/,$p' release-meta/VERSIONS.md
+          } > notes.md
+          gh release edit "$tag" --draft=false --notes-file notes.md --latest
+      - name: VERSIONS.md on main
+        run: |
+          cp release-meta/VERSIONS.md VERSIONS.md
+          git add VERSIONS.md
+          if ! git diff --cached --quiet; then
+            git commit -m "Release ${{ needs.prepare.outputs.tag }}: VERSIONS.md"
+            git fetch origin main && git rebase FETCH_HEAD && git push origin HEAD:main
+          fi
+
+  cleanup:
+    needs: [prepare, test-windows, test-wsl]
+    if: ${{ always() && inputs.quick && needs.prepare.result == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: delete the throwaway draft
+        run: gh release delete ${{ needs.prepare.outputs.tag }} --yes --cleanup-tag || true
