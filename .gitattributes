@@ -14,3 +14,5 @@
 *.exe     binary
 *.zip     binary
 *.gz      binary
+wsl/dev-toolkit-link text eol=lf
+wsl/*.sh  text eol=lf

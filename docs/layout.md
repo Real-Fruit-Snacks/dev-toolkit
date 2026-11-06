@@ -99,7 +99,26 @@ User environment variables it sets: `PATH` additions, `CARGO_HOME`, `RUSTUP_HOME
 
 ## Inside the WSL distro
 
-The distro carries its own toolchains (Rust stable, Python 3.14 through uv, Node LTS, .NET SDK, build
-tools) and a `dev-toolkit-link` command. `dtk.exe` runs it once after `wsl --import`, with the Windows root
-as a `/mnt/<drive>/...` path, and it points Cargo, pip, uv, npm and NuGet inside the distro at the caches
-under that root.
+`wsl-distro.tar.gz` is Ubuntu 24.04 (the signed `ubuntu-24.04.x-wsl-amd64.wsl` image from releases.ubuntu.com,
+checked against its SHA256SUMS) with its own toolchains: Rust stable through rustup, Python 3.14 through uv,
+Node LTS, the .NET SDK and the usual build tools. The default user is `dev` (uid 1000, passwordless sudo);
+`appendWindowsPath=false`, so the Windows tools on PATH don't shadow the Linux ones.
+
+After `wsl --import`, dtk.exe runs, once:
+
+```
+wsl -d dev-toolkit -u dev -- /usr/local/bin/dev-toolkit-link /mnt/<drive>/.../dev-toolkit
+```
+
+It exits 0 when it linked at least one cache, 1 when it failed or found none, 2 on bad usage. It merges
+into existing files and writes, for `dev`:
+
+| File | Settings |
+|---|---|
+| `~/.cargo/config.toml` | crates-io replaced by the local registry at `<root>/crates`; `net.offline = true` |
+| `~/.config/pip/pip.conf` | `no-index`, `find-links = <root>/wheels/linux`, `disable-pip-version-check` |
+| `~/.config/uv/uv.toml` | `offline`, `no-index`, `find-links`, `python-downloads = "never"` |
+| `~/.npmrc` | `cache = <root>/npm-cache`, `offline`, `audit=false`, `fund=false`, `update-notifier=false` |
+| `~/.nuget/NuGet/NuGet.Config` | only the local feed at `<root>/nuget` |
+
+Commands run through `wsl -- ...` without a login shell don't get `~/.cargo/bin`; use `wsl -- bash -lc '...'`.

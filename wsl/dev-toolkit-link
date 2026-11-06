@@ -1,0 +1,387 @@
+#!/usr/bin/python3 -I
+"""Point Cargo, pip, uv, npm and NuGet in this WSL distro at the package
+caches dev-toolkit installed on the Windows side.
+
+  dev-toolkit-link /mnt/c/Users/<name>/AppData/Local/dev-toolkit
+
+Run it as the dev user, not root. Running it again is safe (for example after
+the dev-toolkit folder moved): only the settings below are set, everything
+else in those files is kept. Comments in a rewritten TOML or INI file are not
+kept. A cache folder that isn't there is skipped with a note.
+
+  ~/.cargo/config.toml         crates-io replaced by <root>/crates, net.offline
+  ~/.config/pip/pip.conf       no-index, find-links <root>/wheels/linux,
+                               disable-pip-version-check
+  ~/.config/uv/uv.toml         offline, no-index, find-links <root>/wheels/linux,
+                               python-downloads = "never"
+  ~/.npmrc                     cache <root>/npm-cache, offline, audit, fund and
+                               update-notifier off
+  ~/.nuget/NuGet/NuGet.Config  <root>/nuget as the only package source
+"""
+
+import argparse
+import configparser
+import datetime
+import io
+import math
+import os
+import pathlib
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+import tomllib
+import xml.etree.ElementTree as ET
+
+PROG = "dev-toolkit-link"
+SOURCE = "dev-toolkit"  # name of the Cargo source and the NuGet feed
+
+
+class LinkError(Exception):
+    pass
+
+
+# ------------------------------------------------------------------ paths --
+
+def to_wsl_path(raw):
+    """Take /mnt/<drive>/... as given; turn C:\\... into the WSL path."""
+    if not re.match(r"^[A-Za-z]:[\\/]", raw):
+        return raw
+    wslpath = shutil.which("wslpath")
+    if wslpath:
+        out = subprocess.run([wslpath, "-u", raw], capture_output=True, text=True)
+        if out.returncode == 0 and out.stdout.strip():
+            return out.stdout.strip()
+    return "/mnt/" + raw[0].lower() + raw[2:].replace("\\", "/")
+
+
+def home():
+    return pathlib.Path(os.path.expanduser("~"))
+
+
+def config_home():
+    xdg = os.environ.get("XDG_CONFIG_HOME", "")
+    return pathlib.Path(xdg) if os.path.isabs(xdg) else home() / ".config"
+
+
+def write_if_changed(path, text, mode=0o644):
+    """Write text to path atomically. Returns wrote, updated or unchanged."""
+    if path.is_symlink():
+        path = path.resolve()
+    old = path.read_text(encoding="utf-8") if path.exists() else None
+    if old == text:
+        return "unchanged"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if old is not None:
+        mode = path.stat().st_mode & 0o7777
+    fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as f:
+            f.write(text)
+        os.chmod(tmp, mode)
+        os.replace(tmp, path)
+    except BaseException:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+        raise
+    return "wrote" if old is None else "updated"
+
+
+# ------------------------------------------------------------------- TOML --
+# tomllib reads TOML but can't write it, so this writes the parsed data back.
+
+BARE_KEY = re.compile(r"^[A-Za-z0-9_-]+$")
+
+
+def toml_str(s):
+    out = ['"']
+    for ch in s:
+        code = ord(ch)
+        if ch in '"\\':
+            out.append("\\" + ch)
+        elif ch == "\n":
+            out.append("\\n")
+        elif ch == "\t":
+            out.append("\\t")
+        elif ch == "\r":
+            out.append("\\r")
+        elif code < 0x20 or code == 0x7F:
+            out.append(f"\\u{code:04x}")
+        else:
+            out.append(ch)
+    out.append('"')
+    return "".join(out)
+
+
+def toml_key(k):
+    return k if BARE_KEY.match(k) else toml_str(k)
+
+
+def toml_value(v):
+    if isinstance(v, bool):
+        return "true" if v else "false"
+    if isinstance(v, int):
+        return str(v)
+    if isinstance(v, float):
+        if math.isnan(v):
+            return "nan"
+        if math.isinf(v):
+            return "inf" if v > 0 else "-inf"
+        return repr(v)
+    if isinstance(v, str):
+        return toml_str(v)
+    if isinstance(v, (datetime.datetime, datetime.date, datetime.time)):
+        return v.isoformat()
+    if isinstance(v, list):
+        return "[" + ", ".join(toml_value(x) for x in v) + "]"
+    if isinstance(v, dict):
+        if not v:
+            return "{}"
+        return "{ " + ", ".join(f"{toml_key(k)} = {toml_value(x)}" for k, x in v.items()) + " }"
+    raise LinkError(f"can't write the TOML value {v!r}")
+
+
+def is_table_array(v):
+    return isinstance(v, list) and bool(v) and all(isinstance(x, dict) for x in v)
+
+
+def is_plain(v):
+    return not isinstance(v, dict) and not is_table_array(v)
+
+
+def toml_dump(data, header):
+    lines = list(header)
+
+    def emit(table, path):
+        for k, v in table.items():
+            if is_plain(v):
+                lines.append(f"{toml_key(k)} = {toml_value(v)}")
+        for k, v in table.items():
+            sub = path + [k]
+            name = ".".join(toml_key(p) for p in sub)
+            if isinstance(v, dict):
+                # a table holding only other tables needs no header of its own
+                if not v or any(is_plain(x) for x in v.values()):
+                    lines.extend(["", f"[{name}]"])
+                emit(v, sub)
+            elif is_table_array(v):
+                for item in v:
+                    lines.extend(["", f"[[{name}]]"])
+                    emit(item, sub)
+
+    emit(data, [])
+    return re.sub(r"\n{3,}", "\n\n", "\n".join(lines)).strip("\n") + "\n"
+
+
+def load_toml(path):
+    if not path.exists():
+        return {}
+    try:
+        return tomllib.loads(path.read_text(encoding="utf-8"))
+    except tomllib.TOMLDecodeError as e:
+        raise LinkError(f"{path} is not valid TOML ({e}); fix or remove it and run again")
+
+
+def table(data, key, path):
+    value = data.setdefault(key, {})
+    if not isinstance(value, dict):
+        raise LinkError(f"{path}: {key} is not a table")
+    return value
+
+
+# ------------------------------------------------------------------ tools --
+
+def link_cargo(root):
+    registry = os.path.join(root, "crates")
+    if not os.path.isdir(os.path.join(registry, "index")):
+        return None, f"{registry}/index not found"
+    cargo_home = pathlib.Path(os.environ.get("CARGO_HOME") or home() / ".cargo")
+    path = cargo_home / "config.toml"
+    if (cargo_home / "config").is_file():
+        path = cargo_home / "config"  # Cargo reads the old name first when it exists
+    data = load_toml(path)
+    sources = table(data, "source", path)
+    table(sources, "crates-io", path)["replace-with"] = SOURCE
+    sources[SOURCE] = {"local-registry": registry}
+    table(data, "net", path)["offline"] = True
+    header = [
+        "# Cargo settings. dev-toolkit-link sets source.crates-io.replace-with,",
+        f"# source.{SOURCE} and net.offline; other settings are kept.",
+        "",
+    ]
+    return write_if_changed(path, toml_dump(data, header)), f"{path}  (crates-io -> {registry}, offline)"
+
+
+def pip_location(path):
+    # pip splits find-links on whitespace, so a path with spaces goes in as a file: URL
+    return pathlib.Path(path).as_uri() if re.search(r"\s", path) else path
+
+
+def link_pip(root):
+    wheels = os.path.join(root, "wheels", "linux")
+    if not os.path.isdir(wheels):
+        return None, f"{wheels} not found"
+    path = config_home() / "pip" / "pip.conf"
+    cp = configparser.RawConfigParser(interpolation=None)
+    cp.optionxform = str  # keep other keys exactly as written
+    if path.exists():
+        try:
+            cp.read_string(path.read_text(encoding="utf-8"), source=str(path))
+        except configparser.Error as e:
+            raise LinkError(f"{path} could not be read ({e}); fix or remove it and run again")
+    if not cp.has_section("global"):
+        cp.add_section("global")
+    settings = {
+        "no-index": "true",
+        "find-links": pip_location(wheels),
+        "disable-pip-version-check": "true",
+    }
+    for key, value in settings.items():
+        cp.remove_option("global", key.replace("-", "_"))  # pip reads both spellings
+        cp.set("global", key, value)
+    buf = io.StringIO()
+    cp.write(buf)
+    header = "# pip settings. dev-toolkit-link sets no-index, find-links and\n" \
+             "# disable-pip-version-check under [global]; other settings are kept.\n\n"
+    text = header + buf.getvalue().strip("\n") + "\n"
+    return write_if_changed(path, text), f"{path}  (find-links {wheels})"
+
+
+def link_uv(root):
+    wheels = os.path.join(root, "wheels", "linux")
+    if not os.path.isdir(wheels):
+        return None, f"{wheels} not found"
+    path = config_home() / "uv" / "uv.toml"
+    data = load_toml(path)
+    data["offline"] = True
+    data["no-index"] = True
+    data["find-links"] = [wheels]
+    data["python-downloads"] = "never"
+    header = [
+        "# uv settings. dev-toolkit-link sets offline, no-index, find-links and",
+        "# python-downloads; other settings are kept.",
+        "",
+    ]
+    return write_if_changed(path, toml_dump(data, header)), f"{path}  (find-links {wheels}, offline)"
+
+
+NPM_MARK = "; dev-toolkit-link sets the next five lines; other settings are kept."
+NPM_KEYS = ("cache", "offline", "audit", "fund", "update-notifier")
+
+
+def link_npm(root):
+    cache = os.path.join(root, "npm-cache")
+    if not os.path.isdir(cache):
+        return None, f"{cache} not found"
+    userconfig = os.environ.get("npm_config_userconfig") or os.environ.get("NPM_CONFIG_USERCONFIG")
+    path = pathlib.Path(userconfig) if userconfig else home() / ".npmrc"
+    keep, in_section = [], False
+    if path.exists():
+        for line in path.read_text(encoding="utf-8").splitlines():
+            s = line.strip()
+            if s.startswith("["):
+                in_section = True
+            if s == NPM_MARK:
+                continue
+            if not in_section and s and s[0] not in "#;" and "=" in s:
+                if s.split("=", 1)[0].strip() in NPM_KEYS:
+                    continue
+            keep.append(line)
+    while keep and not keep[0].strip():
+        keep.pop(0)
+    ours = [NPM_MARK, f"cache={cache}", "offline=true", "audit=false", "fund=false", "update-notifier=false"]
+    # ours go first: in an npmrc, keys after a [section] line belong to that section
+    lines = ours + ([""] + keep if keep else [])
+    return write_if_changed(path, "\n".join(lines) + "\n", mode=0o600), f"{path}  (cache {cache}, offline)"
+
+
+NUGET_NOTE = f" dev-toolkit-link makes {SOURCE} the only package source; other settings are kept. "
+
+
+def link_nuget(root):
+    feed = os.path.join(root, "nuget")
+    if not os.path.isdir(feed):
+        return None, f"{feed} not found"
+    path = home() / ".nuget" / "NuGet" / "NuGet.Config"
+    if path.exists():
+        parser = ET.XMLParser(target=ET.TreeBuilder(insert_comments=True))
+        try:
+            tree = ET.parse(path, parser)
+        except ET.ParseError as e:
+            raise LinkError(f"{path} is not valid XML ({e}); fix or remove it and run again")
+        config = tree.getroot()
+        if config.tag != "configuration":
+            raise LinkError(f"{path}: the root element is <{config.tag}>, not <configuration>")
+    else:
+        config = ET.Element("configuration")
+        tree = ET.ElementTree(config)
+    if not any(c.tag is ET.Comment and c.text == NUGET_NOTE for c in config):
+        config.insert(0, ET.Comment(NUGET_NOTE))
+    sources = config.find("packageSources")
+    if sources is None:
+        sources = ET.Element("packageSources")
+        config.insert(1, sources)
+    for child in list(sources):
+        sources.remove(child)
+    ET.SubElement(sources, "clear")
+    ET.SubElement(sources, "add", {"key": SOURCE, "value": feed})
+    disabled = config.find("disabledPackageSources")
+    if disabled is not None:
+        for child in list(disabled):
+            if child.get("key") == SOURCE:
+                disabled.remove(child)
+    ET.indent(tree, space="  ")
+    buf = io.BytesIO()
+    tree.write(buf, encoding="utf-8", xml_declaration=True)
+    text = buf.getvalue().decode("utf-8") + "\n"
+    return write_if_changed(path, text, mode=0o600), f"{path}  (feed {feed})"
+
+
+STEPS = [("Cargo", link_cargo), ("pip", link_pip), ("uv", link_uv), ("npm", link_npm), ("NuGet", link_nuget)]
+
+
+def main(argv=None):
+    ap = argparse.ArgumentParser(
+        prog=PROG,
+        description=__doc__.split("\n\n")[0],
+        epilog="\n\n".join(__doc__.split("\n\n")[1:]),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    ap.add_argument("root", help="the dev-toolkit folder on Windows, as a WSL path")
+    args = ap.parse_args(argv)
+
+    if os.geteuid() == 0:
+        print(f"{PROG}: run this as the dev user, not root "
+              f"(for example: wsl -d <distro> -u dev -- {PROG} <root>)", file=sys.stderr)
+        return 2
+    root = os.path.normpath(os.path.abspath(to_wsl_path(args.root)))
+    if not os.path.isdir(root):
+        print(f"{PROG}: {root} is not a folder", file=sys.stderr)
+        return 2
+
+    print(f"{PROG}: caches under {root}")
+    linked = failed = 0
+    for name, step in STEPS:
+        try:
+            status, detail = step(root)
+        except (LinkError, OSError) as e:
+            print(f"  {name:<6} failed     {e}", file=sys.stderr)
+            failed += 1
+            continue
+        if status is None:
+            print(f"  {name:<6} skipped    {detail}")
+        else:
+            print(f"  {name:<6} {status:<10} {detail}")
+            linked += 1
+    if failed:
+        return 1
+    if not linked:
+        print(f"{PROG}: none of crates/, wheels/linux/, npm-cache/ or nuget/ is under {root}; "
+              "is that the dev-toolkit folder?", file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

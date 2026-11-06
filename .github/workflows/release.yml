@@ -241,7 +241,10 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: build the distro in a chroot
-        run: sudo -E bash scripts/build-distro.sh --out out/wsl-distro.tar.gz && sudo chown -R "$(id -u):$(id -g)" out
+        run: |
+          sudo apt-get install -y -qq pigz >/dev/null
+          sudo -E bash scripts/build-distro.sh --out out/wsl-distro.tar.gz
+          sudo chown -R "$(id -u):$(id -g)" out
       - name: upload
         run: python3 scripts/upload-assets.py --tag ${{ needs.prepare.outputs.tag }} --out out --meta meta
       - run: mkdir -p facts && cp out/*.facts.json facts/
