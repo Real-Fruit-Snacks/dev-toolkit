@@ -147,7 +147,7 @@ jobs:
           node scripts\build-npm-cache.mjs @a
           if ($LASTEXITCODE) { throw 'npm cache build failed' }
           Push-Location D:\out\npm-cache
-          7z a -tzip -mx=0 -bso0 -bsp0 D:\out\npm-cache.zip *
+          7z a -tzip -mx=1 -mmt=on -bso0 -bsp0 D:\out\npm-cache.zip *   # package metadata deflates to about a fifth
           if ($LASTEXITCODE) { throw '7z failed' }
           Pop-Location
           Remove-Item D:\out\npm-cache -Recurse -Force
