@@ -94,7 +94,13 @@ int triple(int x) { return 3 * x; }'
     Try-Cmd 'cargo build --release' 'cargo build --quiet --release' $p | Out-Null
     Try-Cmd 'cargo clippy' 'cargo clippy --quiet' $p | Out-Null
   }
-  foreach ($t in 'cargo nextest --version', 'cargo audit --version', 'cargo deny --version', 'bacon --version', 'cargo expand --version') { Try-Cmd $t $t | Out-Null }
+  # quick test builds carry only some of the cargo tools; a full release build fails if any is missing
+  foreach ($t in @{ exe = 'cargo-nextest'; cmd = 'cargo nextest --version' }, @{ exe = 'cargo-audit'; cmd = 'cargo audit --version' },
+                 @{ exe = 'cargo-deny'; cmd = 'cargo deny --version' }, @{ exe = 'bacon'; cmd = 'bacon --version' },
+                 @{ exe = 'cargo-expand'; cmd = 'cargo expand --version' }) {
+    if (Test-Path (Join-Path $env:CARGO_HOME "bin\$($t.exe).exe")) { Try-Cmd $t.cmd $t.cmd | Out-Null }
+    else { Write-Host "  skip  $($t.exe) (not in this build)" }
+  }
 }
 
 if ($selected -contains 'python') {
